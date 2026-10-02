@@ -97,6 +97,7 @@ export const FacultiesAndGroupsPage: React.FC = () => {
   const openEditor = (recordTier: AcademicTier, record?: AcademicRecord) => {
     const path = record ? academicPath(academicState, recordTier, record.id) : undefined;
     setForm({
+      expectedVersion: record?.rowVersion,
       name: record?.name || '',
       code: record?.code || '',
       facultyId: path?.faculty?.id || filter.facultyId,
@@ -149,16 +150,16 @@ export const FacultiesAndGroupsPage: React.FC = () => {
     setError('');
   };
 
-  const assignStudents = () => {
+  const assignStudents = async () => {
     if (!assigningGroup || !selectedStudentIds.length) return;
-    const result = assignStudentsToClassGroup(assigningGroup.id, selectedStudentIds, confirmReassignment);
+    const result = (await assignStudentsToClassGroup(assigningGroup.id, selectedStudentIds, confirmReassignment));
     if (result.success) setAssigningGroupId(null);
     else setError(result.error || 'ไม่สามารถเพิ่มนักศึกษาเข้ากลุ่มได้');
   };
 
-  const save = () => {
+  const save = async () => {
     if (!editor) return;
-    const result = saveAcademicRecord(editor.tier, form, editor.id);
+    const result = (await saveAcademicRecord(editor.tier, form, editor.id));
     if (result.success) setEditor(null);
     else setError(result.error || 'ไม่สามารถบันทึกข้อมูลได้');
   };
@@ -275,7 +276,7 @@ export const FacultiesAndGroupsPage: React.FC = () => {
                   {tier === 'faculties' && <><td className="px-4 py-4 text-slate-600">{departmentCount} ภาควิชา</td><td className="px-4 py-4 text-slate-600">{majorCount} สาขาวิชา</td></>}
                   {tier === 'departments' && <><td className="px-4 py-4 text-slate-600">{path.faculty?.name || '—'}</td><td className="px-4 py-4 text-slate-600">{majorCount} สาขาวิชา</td></>}
                   {tier === 'majors' && <><td className="px-4 py-4 text-slate-600">{path.department?.name || '—'}</td><td className="px-4 py-4 text-slate-500">{path.faculty?.name || '—'}</td></>}
-                  {tier === 'classGroups' && 'admissionYear' in record && <><td className="px-4 py-4 text-slate-600">{path.major ? `[${path.major.code}] ${path.major.name}` : '—'}</td><td className="px-4 py-4 font-semibold">ปีที่เข้าศึกษา {getAdmissionCode(record.admissionYear)}</td><td className="px-4 py-4">{calculateYearLevelFromAdmissionYear(record.admissionYear).isValid ? `ชั้นปี ${calculateYearLevelFromAdmissionYear(record.admissionYear).yearLevel}` : '—'}</td><td className="px-4 py-4">{studentsInAcademicRecord(academicState, students, tier, record.id).length} คน</td></>}
+                  {tier === 'classGroups' && 'admissionYear' in record && <><td className="px-4 py-4 text-slate-600">{path.major ? `[${path.major.code}] ${path.major.name}` : '—'}</td><td className="px-4 py-4 font-semibold">ปีที่เข้าศึกษา {getAdmissionCode(Number(record.admissionYear))}</td><td className="px-4 py-4">{calculateYearLevelFromAdmissionYear(Number(record.admissionYear)).isValid ? `ชั้นปี ${calculateYearLevelFromAdmissionYear(Number(record.admissionYear)).yearLevel}` : '—'}</td><td className="px-4 py-4">{studentsInAcademicRecord(academicState, students, tier, record.id).length} คน</td></>}
                   <td className="px-4 py-4"><span className={`rounded-full border px-2 py-1 text-[10px] ${record.status === 'active' ? 'border-teal-200 bg-teal-50 text-teal-700' : 'border-slate-200 bg-slate-100 text-slate-500'}`}>{record.status === 'active' ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}</span></td>
                   <td className="px-3 py-3">{renderActions(record)}</td>
                 </tr>;
@@ -329,8 +330,8 @@ export const FacultiesAndGroupsPage: React.FC = () => {
                     ['คณะ', path.faculty?.name || '—'],
                     ['ภาควิชา', path.department?.name || '—'],
                     ['สาขาวิชา', path.major ? `[${path.major.code}] ${path.major.name}` : '—'],
-                    ['ปีที่เข้าศึกษา', `ปีที่เข้าศึกษา ${getAdmissionCode(detailRecord.admissionYear)}`],
-                    ['ชั้นปี', calculateYearLevelFromAdmissionYear(detailRecord.admissionYear).isValid ? `ชั้นปี ${calculateYearLevelFromAdmissionYear(detailRecord.admissionYear).yearLevel}` : '—'],
+                    ['ปีที่เข้าศึกษา', `ปีที่เข้าศึกษา ${getAdmissionCode(Number(detailRecord.admissionYear))}`],
+                    ['ชั้นปี', calculateYearLevelFromAdmissionYear(Number(detailRecord.admissionYear)).isValid ? `ชั้นปี ${calculateYearLevelFromAdmissionYear(Number(detailRecord.admissionYear)).yearLevel}` : '—'],
                   ]
                   : [];
           const detailRows: Array<[string, string | number]> = [
@@ -371,10 +372,10 @@ export const FacultiesAndGroupsPage: React.FC = () => {
       <Modal isOpen={Boolean(confirmRecord)} onClose={() => setConfirm(null)} title={confirm?.action === 'delete' ? 'ยืนยันการลบ' : 'ยืนยันการเปลี่ยนสถานะ'}>
         {confirm && confirmRecord && <div className="space-y-4 text-sm">
           {deleteError ? <p role="alert" className="rounded-xl bg-amber-50 p-4 text-amber-800"><AlertTriangle className="mb-2 h-5 w-5" />{deleteError}</p> : <p>ยืนยัน{confirm.action === 'delete' ? 'ลบ' : confirmRecord.status === 'active' ? 'ปิดใช้งาน' : 'เปิดใช้งาน'} “{confirmRecord.name}” หรือไม่?</p>}
-          <div className="flex justify-end gap-2"><button type="button" onClick={() => setConfirm(null)} className={`${buttonClass} border`}>{deleteError ? 'ปิด' : 'ยกเลิก'}</button>{!deleteError && <button type="button" className={`${buttonClass} bg-blue-600 text-white`} onClick={() => {
+          <div className="flex justify-end gap-2"><button type="button" onClick={() => setConfirm(null)} className={`${buttonClass} border`}>{deleteError ? 'ปิด' : 'ยกเลิก'}</button>{!deleteError && <button type="button" className={`${buttonClass} bg-blue-600 text-white`} onClick={async () => {
             const result = confirm.action === 'delete'
-              ? deleteAcademicRecord(confirm.tier, confirm.id)
-              : setAcademicStatus(confirm.tier, confirm.id, confirmRecord.status === 'active' ? 'inactive' : 'active');
+              ? (await deleteAcademicRecord(confirm.tier, confirm.id))
+              : (await setAcademicStatus(confirm.tier, confirm.id, confirmRecord.status === 'active' ? 'inactive' : 'active'));
             if (result.success) setConfirm(null);
           }}>ยืนยัน</button>}</div>
         </div>}

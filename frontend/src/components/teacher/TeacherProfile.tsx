@@ -12,6 +12,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { Badge } from '../common/Badge';
+import { dataSource } from '../../services/dataSource';
 
 export const TeacherProfile: React.FC = () => {
   const { currentTeacher, courses, setRole, showToast, language } = useApp();
@@ -28,7 +29,7 @@ export const TeacherProfile: React.FC = () => {
         </h1>
         <p className="text-xs text-gray-500">
           {isThai
-            ? 'ข้อมูลประจำตัวสถาบัน เชื่อมต่อระบบ ICIT SSO และสังกัดคณะ/ภาควิชา'
+            ? dataSource === 'api' ? 'ข้อมูลบัญชี SecureLab และสังกัดคณะ/ภาควิชา' : 'ข้อมูลประจำตัวสถาบัน เชื่อมต่อระบบ ICIT SSO และสังกัดคณะ/ภาควิชา'
             : 'University credentials, verified ICIT SSO link, and faculty department affiliations.'}
         </p>
       </div>
@@ -47,7 +48,7 @@ export const TeacherProfile: React.FC = () => {
               </Badge>
               <Badge variant="success" size="sm">
                 <CheckCircle2 className="w-3 h-3" />
-                <span>{isThai ? 'ICIT เชื่อมต่อแล้ว' : 'ICIT Active'}</span>
+                <span>{dataSource === 'api' ? 'ข้อมูล ICIT ที่ผู้ดูแลกำหนด' : isThai ? 'ICIT เชื่อมต่อแล้ว' : 'ICIT Active'}</span>
               </Badge>
             </div>
             <p className="text-xs text-gray-500 mt-0.5 font-mono">
@@ -84,7 +85,7 @@ export const TeacherProfile: React.FC = () => {
               {isThai ? 'ผู้ให้บริการยืนยันตัวตน' : 'Authentication Provider'}
             </span>
             <span className="font-semibold text-gray-900 text-sm">
-              {isThai
+              {dataSource === 'api' ? 'บัญชี SecureLab ที่ผู้ดูแลจัดเตรียม' : isThai
                 ? 'ระบบสารสนเทศกลาง ICIT มหาวิทยาลัยเทคโนโลยีพระจอมเกล้า'
                 : "King Mongkut's University of Technology ICIT Directory"}
             </span>
@@ -104,10 +105,11 @@ export const TeacherProfile: React.FC = () => {
               >
                 <div>
                   <span className="font-bold text-gray-900">{c.courseCode}: {c.courseName}</span>
-                  <span className="text-gray-500 block text-[11px]">{c.academicYear} • {c.semester}</span>
+                  <span className="text-gray-500 block text-[11px]">{c.sections.map((section) => `${section.academicYear} / ${section.semester} ตอนเรียน ${section.sectionNo}`).join(', ')}</span>
                 </div>
                 <Badge variant="blue" size="sm">
-                  {isThai ? 'อาจารย์ผู้ประสานงานหลัก' : 'Primary Instructor'}
+                  {c.sections.some((section) => (section.primaryTeacherId || section.teacherId) === currentTeacher?.id)
+                    ? 'อาจารย์ผู้สอนหลัก' : 'อาจารย์ผู้สอนร่วม'}
                 </Badge>
               </div>
             ))}
@@ -117,7 +119,7 @@ export const TeacherProfile: React.FC = () => {
         <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
           <span className="text-xs text-gray-400">
             {isThai
-              ? 'ข้อมูลโปรไฟล์ซิงค์อัตโนมัติกับฐานข้อมูลกลาง ICIT'
+              ? dataSource === 'api' ? 'ข้อมูลโปรไฟล์ที่ผู้ดูแลระบบจัดเตรียม' : 'ข้อมูลโปรไฟล์ซิงค์อัตโนมัติกับฐานข้อมูลกลาง ICIT'
               : 'Profile synchronized automatically with ICIT central database.'}
           </span>
           <button

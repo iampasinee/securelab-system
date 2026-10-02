@@ -1,6 +1,12 @@
 # SecureLab
 
-SecureLab เป็น frontend prototype ภาษาไทยสำหรับการจัดสอบในห้องปฏิบัติการ การจัดการผู้ใช้งาน/รายวิชา และการส่งไฟล์ข้อสอบ ใช้ React 19, TypeScript, Vite 6 และ Tailwind CSS 4 ระบบ Login, ICIT, biometric verification, exam monitoring, file transfer และ integrity checking เป็นการจำลองใน browser และยังไม่มี production backend
+SecureLab เป็น frontend ภาษาไทยสำหรับการจัดสอบในห้องปฏิบัติการ การจัดการผู้ใช้งาน/รายวิชา และการส่งไฟล์ข้อสอบ ใช้ React 19, TypeScript, Vite 6 และ Tailwind CSS 4 มี mock mode เดิมเป็นค่าเริ่มต้น และ API mode ที่เชื่อม FastAPI/PostgreSQL พร้อมบัญชีที่ Admin จัดเตรียม การส่ง bytes จริง และประวัติ FINAL ส่วน ICIT/Google, Agent, biometric และ network enforcement ยังไม่ใช่ integration จริง
+
+## API mode
+
+ทำตาม [คู่มือ root](../README.md) เพื่อเปิด backend จากนั้นตั้ง `VITE_SECURELAB_DATA_SOURCE=api` และ `SECURELAB_BACKEND_URL=http://localhost:8000` ก่อนรัน Vite กำหนด trusted origins ของ backend ให้ตรงกับ frontend API mode ไม่ใช้ mock storage/IDs และไม่เปิด simulation bypass Drafts และ staged browser files แยก namespace ตาม user/Section/attempt ของ server
+
+รายละเอียด mock และ browser migrations ด้านล่างยังใช้ใน mock mode ดู [API contract](../docs/api/README.md) สำหรับ server behavior
 
 ## เริ่มใช้งาน
 
@@ -32,6 +38,7 @@ npm run dev
 | `npm run test:student-demo` | ทดสอบการเข้าสอบและส่งซ้ำในโหมดทดสอบโดยไม่แก้ submission หลัก |
 | `npm run test:exam-status` | ทดสอบสถานะสอบจากวันเวลาและกฎการเข้าสอบ |
 | `npm run test:monitoring` | ทดสอบสิทธิ์และข้อมูลปฏิทิน/ภาพรวมการติดตามสอบ |
+| `npm run test:api` | ทดสอบ DTO/Section UUID/server time/token refresh/idempotency และ errors ภาษาไทย |
 | `npm run build` | สร้าง production bundle ใน `dist/` |
 | `npm run preview` | เปิด production bundle ในเครื่อง |
 | `git diff --check` | ตรวจ whitespace errors |
@@ -256,4 +263,4 @@ git diff --check
 
 ควร regression-test Student, Teacher และ Admin flows ที่ได้รับผลกระทบ Vite อาจแสดงคำเตือน bundle size ซึ่งไม่ทำให้ build ล้มเหลว
 
-อ่านกติกาสำหรับผู้พัฒนาที่ [AGENTS.md](AGENTS.md)
+อ่านกติกาสำหรับผู้พัฒนาที่ [AGENTS.md](../AGENTS.md) และวิธีเริ่มใช้งานระบบรวมที่ [SecureLab System](../README.md) คำสั่ง npm ในเอกสารนี้รันจาก `frontend/`

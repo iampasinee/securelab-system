@@ -2,7 +2,7 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 
 interface BadgeProps {
-  variant?: 'default' | 'success' | 'warning' | 'danger' | 'neutral' | 'info' | 'purple';
+  variant?: 'default' | 'blue' | 'success' | 'warning' | 'danger' | 'neutral' | 'info' | 'purple';
   children: React.ReactNode;
   className?: string;
   size?: 'sm' | 'md';
@@ -18,6 +18,7 @@ export const Badge: React.FC<BadgeProps> = ({
 
   const variantClasses = {
     default: 'bg-blue-50 text-blue-700 border border-blue-200',
+    blue: 'bg-blue-50 text-blue-700 border border-blue-200',
     success: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
     warning: 'bg-amber-50 text-amber-700 border border-amber-200',
     danger: 'bg-red-50 text-red-700 border border-red-200',
@@ -46,11 +47,13 @@ export const AccountStatusBadge: React.FC<{ status: 'active' | 'suspended' | 'gr
   return <Badge variant="neutral">{isThai ? 'พ้นสภาพ / ไม่ใช้งาน' : 'Graduated / Inactive'}</Badge>;
 };
 
-export const MachineStatusBadge: React.FC<{ status: 'online' | 'offline' | 'damaged' | 'unavailable' }> = ({ status }) => {
+export const MachineStatusBadge: React.FC<{ status: import('../../types').MachineStatus }> = ({ status }) => {
   const { language } = useApp();
   const isThai = language === 'th';
 
   switch (status) {
+    case 'unknown':
+      return <Badge variant="neutral">ยังไม่มีผลการเชื่อมต่อ</Badge>;
     case 'online':
       return (
         <Badge variant="success">

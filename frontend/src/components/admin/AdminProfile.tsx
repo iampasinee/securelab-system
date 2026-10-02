@@ -12,10 +12,12 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { Badge } from '../common/Badge';
+import { dataSource } from '../../services/dataSource';
 
 export const AdminProfile: React.FC = () => {
-  const { setRole, showToast, resetData, language } = useApp();
+  const { setRole, showToast, resetToMockDefaults: resetData, language, currentAdmin } = useApp();
   const isThai = language === 'th';
+  if (dataSource === 'api') return <section className="space-y-4 rounded-2xl border bg-white p-6"><h1 className="text-2xl font-bold">ข้อมูลผู้ดูแลระบบ</h1><p>{currentAdmin?.fullName}</p><p className="text-sm text-gray-600">{currentAdmin?.email} · {currentAdmin?.adminCode}</p><p className="text-sm text-gray-500">การสำรองข้อมูล การส่งข้อความไปยังเครื่องสอบ และการตรวจใบหน้าจะเพิ่มเมื่อมีบริการที่เชื่อมต่อจริง</p></section>;
 
   const handleBackup = () => {
     showToast(

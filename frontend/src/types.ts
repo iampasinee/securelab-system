@@ -6,7 +6,7 @@ export type AccountStatus = 'active' | 'suspended' | 'graduated_inactive';
 
 export type RoomReadiness = 'ready' | 'maintenance' | 'unavailable';
 
-export type MachineStatus = 'online' | 'offline' | 'damaged' | 'unavailable';
+export type MachineStatus = 'online' | 'offline' | 'damaged' | 'unavailable' | 'unknown';
 
 export type ExamFormat = 'offline' | 'online';
 
@@ -70,6 +70,7 @@ export type FileIntegrityStatus = 'valid' | 'invalid' | 'damaged' | 'pending';
 export type ViolationType = 'unauthorized_website' | 'duplicate_login' | 'unauthorized_device' | 'tab_switch' | 'peripheral_connected';
 
 export interface Student {
+  rowVersion?: number;
   id: string;
   studentCode: string;
   fullName: string;
@@ -112,6 +113,7 @@ export interface SectionCohort {
 }
 
 export interface Teacher {
+  rowVersion?: number;
   id: string;
   teacherCode: string;
   fullName: string;
@@ -128,6 +130,7 @@ export interface Teacher {
 }
 
 export interface Admin {
+  rowVersion?: number;
   id: string;
   adminCode: string;
   fullName: string;
@@ -137,6 +140,9 @@ export interface Admin {
 }
 
 export interface SeatBinding {
+  seatId?: string;
+  deviceId?: string;
+  isAssignable?: boolean;
   seatNo: string;
   machineNo: string;
   ip: string;
@@ -146,6 +152,9 @@ export interface SeatBinding {
 }
 
 export interface Room {
+  rowVersion?: number;
+  capacity?: number;
+  computerCount?: number;
   id: string;
   building: string;
   floor: number;
@@ -158,6 +167,7 @@ export interface Room {
 }
 
 export interface Section {
+  rowVersion?: number;
   id?: string;
   courseId?: string;
   sectionNo: string;
@@ -181,6 +191,7 @@ export interface Section {
 }
 
 export interface Course {
+  rowVersion?: number;
   id: string;
   courseCode: string;
   courseName: string;
@@ -203,6 +214,13 @@ export interface ExamRule {
 }
 
 export interface ExamSession {
+  sectionId?: string;
+  rowVersion?: number;
+  revision?: number;
+  startsAt?: string;
+  endsAt?: string;
+  serverNow?: string;
+  capabilities?: Record<string, boolean>;
   id: string;
   examName?: string;
   examType?: ExamType;
@@ -233,12 +251,15 @@ export interface ExamSession {
 }
 
 export interface SeatAssignment {
+  seatId?: string;
+  deviceId?: string;
   examId: string;
   seatNo: string;
   studentId: string;
 }
 
 export interface SubmittedFile {
+  sha256?: string;
   uploadId?: string;
   fileName: string;
   sizeKb: number;
@@ -249,6 +270,10 @@ export interface SubmittedFile {
 }
 
 export interface Submission {
+  versionId?: string;
+  versionNumber?: number;
+  isComplete?: boolean;
+  hasOpenVersion?: boolean;
   id: string;
   examId: string;
   studentId: string;
@@ -259,6 +284,10 @@ export interface Submission {
 }
 
 export interface Violation {
+  source?: 'development_simulation';
+  studentSeenAt?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
   id: string;
   examId: string;
   studentId: string;
@@ -270,6 +299,11 @@ export interface Violation {
 }
 
 export interface AuditLog {
+  performedBy?: string;
+  role?: string;
+  target?: string;
+  ip?: string;
+  status?: 'success' | 'warning' | 'failure';
   id: string;
   timestamp: string;
   actor: string;

@@ -1,4 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { api } from '../../services/apiClient';
+import { dataSource } from '../../services/dataSource';
 import { Check, ChevronLeft, ChevronRight, Layers3 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import {
@@ -39,15 +41,29 @@ export const AcademicStructureWizard: React.FC<AcademicStructureWizardProps> = (
   const [confirmed, setConfirmed] = useState(false);
   const [exitConfirmation, setExitConfirmation] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [serverPreview, setServerPreview] = useState<AcademicStructureTransactionResult | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const validation = useMemo(
     () => buildAcademicStructureTransaction(academicState, draft, step),
     [academicState, draft, step],
   );
-  const preview = useMemo(
+  const localPreview = useMemo(
     () => buildAcademicStructureTransaction(academicState, draft, 4),
     [academicState, draft],
   );
+  const preview = dataSource === 'api' ? serverPreview || { ...localPreview, groupCodes: [] } : localPreview;
+  useEffect(() => {
+    if (dataSource !== 'api' || step < 4 || localPreview.error) return;
+    setServerPreview(null);
+    let live = true;
+    const timer = window.setTimeout(() => {
+      const body = { ...draft, ...Object.fromEntries(['faculty', 'department', 'major'].map((key) => { const choice = draft[key as 'faculty']; return [key, { ...choice, existingId: choice.existingId || null }]; })) };
+      api.request<AcademicStructureTransactionResult>('/academic/structures/preview', { method: 'POST', body })
+        .then((result) => { if (live) { setServerPreview(result); setSubmitError(''); } }).catch((failure) => { if (live) setSubmitError(failure.message); });
+    }, 250);
+    return () => { live = false; window.clearTimeout(timer); };
+  }, [draft, step, localPreview.error]);
   const isDirty = JSON.stringify(draft) !== JSON.stringify(initialDraft);
 
   const requestClose = () => {
@@ -145,13 +161,15 @@ export const AcademicStructureWizard: React.FC<AcademicStructureWizardProps> = (
     </div>
   );
 
-  const submit = () => {
+  const submit = async () => {
     if (step < 5) {
       if (!validation.error) setStep((current) => Math.min(5, current + 1) as 1 | 2 | 3 | 4 | 5);
       return;
     }
-    if (!confirmed) return;
-    const result = saveAcademicStructure(draft);
+    if (!confirmed || saving || (dataSource === 'api' && !serverPreview)) return;
+    setSaving(true);
+    const result = (await saveAcademicStructure(draft));
+    setSaving(false);
     if (result.success) onSuccess(result);
     else {
       setSubmitError(result.error || 'ไม่สามารถเพิ่มโครงสร้างการศึกษาได้');
@@ -179,7 +197,7 @@ export const AcademicStructureWizard: React.FC<AcademicStructureWizardProps> = (
       </nav>}
       footer={exitConfirmation
         ? <><button type="button" onClick={() => setExitConfirmation(false)} className={`${buttonClass} border border-slate-200 bg-white text-slate-700`}>กลับไปทำต่อ</button><button type="button" onClick={onClose} className={`${buttonClass} bg-red-600 text-white`}>ออกโดยไม่บันทึก</button></>
-        : <><button type="button" onClick={requestClose} className={`${buttonClass} mr-auto border border-slate-200 bg-white text-slate-700`}>ยกเลิก</button>{step > 1 && <button type="button" onClick={() => { setStep((current) => Math.max(1, current - 1) as 1 | 2 | 3 | 4 | 5); setSubmitError(''); }} className={`${buttonClass} border border-slate-200 bg-white text-slate-700`}><ChevronLeft className="h-4 w-4" />ย้อนกลับ</button>}<button type="button" onClick={submit} disabled={Boolean(validation.error) || (step === 5 && !confirmed)} className={`${buttonClass} bg-blue-600 text-white hover:bg-blue-700`}>{step === 5 ? <><Check className="h-4 w-4" />ยืนยันและบันทึก</> : <>ถัดไป<ChevronRight className="h-4 w-4" /></>}</button></>}
+        : <><button type="button" onClick={requestClose} className={`${buttonClass} mr-auto border border-slate-200 bg-white text-slate-700`}>ยกเลิก</button>{step > 1 && <button type="button" onClick={() => { setStep((current) => Math.max(1, current - 1) as 1 | 2 | 3 | 4 | 5); setSubmitError(''); }} className={`${buttonClass} border border-slate-200 bg-white text-slate-700`}><ChevronLeft className="h-4 w-4" />ย้อนกลับ</button>}<button type="button" onClick={submit} disabled={saving || Boolean(validation.error) || (step === 5 && (!confirmed || (dataSource === 'api' && !serverPreview)))} className={`${buttonClass} bg-blue-600 text-white hover:bg-blue-700`}>{step === 5 ? <><Check className="h-4 w-4" />ยืนยันและบันทึก</> : <>ถัดไป<ChevronRight className="h-4 w-4" /></>}</button></>}
     >
       {exitConfirmation ? <div className="space-y-3 text-sm text-slate-600"><p>ข้อมูลที่กรอกไว้ยังไม่ได้บันทึก</p><p>หากออกตอนนี้ ระบบจะยกเลิกข้อมูลร่างทั้งหมดและจะไม่มีการสร้างข้อมูลใด ๆ</p></div> : <form onSubmit={(event) => { event.preventDefault(); submit(); }} className="space-y-5">
         <div className="flex items-center gap-3"><div className="rounded-xl bg-blue-50 p-2 text-blue-600"><Layers3 className="h-5 w-5" /></div><div><h2 className="font-bold text-slate-950">{step}. {steps[step - 1]}</h2><p className="text-xs text-slate-500">ข้อมูลจะถูกบันทึกพร้อมกันเมื่อยืนยันในขั้นตอนสุดท้าย</p></div></div>
@@ -192,7 +210,7 @@ export const AcademicStructureWizard: React.FC<AcademicStructureWizardProps> = (
 
         {step === 4 && <div className="space-y-5"><div className="grid gap-4 sm:grid-cols-2"><label className="space-y-1 text-xs font-semibold text-slate-700"><span>ปีที่เข้าศึกษา</span><select value={draft.admissionYear || ''} onChange={(event) => setDraft((current) => ({ ...current, admissionYear: Number(event.target.value) || undefined }))} className={inputClass}><option value="">เลือกปีที่เข้าศึกษา</option>{getAdmissionYearOptions().map((year) => <option key={year} value={year}>{getAdmissionCode(year)}</option>)}</select><span className="block font-normal text-slate-500">ระบบจัดเก็บเป็นปีเต็ม เช่น 67 = 2567</span></label><label className="space-y-1 text-xs font-semibold text-slate-700"><span>จำนวนกลุ่มเรียน</span><input type="number" min="1" max="20" value={draft.groupCount || ''} onChange={(event) => setDraft((current) => ({ ...current, groupCount: Number(event.target.value) }))} className={inputClass} /><span className="block font-normal text-slate-500">เพิ่มได้ครั้งละ 1–20 กลุ่ม</span></label></div>{!preview.error && <div className="rounded-xl border border-blue-100 bg-blue-50 p-4"><h3 className="text-sm font-bold text-blue-950">ตัวอย่างกลุ่มเรียนใหม่</h3><p className="mt-1 text-xs text-blue-700">ระบบจะต่อรหัสจากลำดับล่าสุด รวมกลุ่มที่ปิดใช้งานหรือเคยใช้งานแล้ว</p><ul className="mt-3 grid gap-2 sm:grid-cols-2">{preview.groupCodes.map((code) => <li key={code} className="rounded-lg border border-blue-200 bg-white px-3 py-2 font-mono text-sm font-semibold text-blue-800">{code}</li>)}</ul></div>}</div>}
 
-        {step === 5 && <div className="space-y-4">{reviewRow('คณะ', validation.faculty)}{reviewRow('ภาควิชา', validation.department)}{reviewRow('สาขาวิชา', validation.major)}<div className="rounded-xl border border-slate-200 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs text-slate-500">ปีที่เข้าศึกษา</p><p className="font-bold">{validation.admissionYear ? getAdmissionCode(validation.admissionYear) : '—'}</p></div><span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">สร้าง {validation.groupCodes.length} กลุ่ม</span></div><ul className="mt-3 grid gap-2 sm:grid-cols-2">{validation.groupCodes.map((code) => <li key={code} className="rounded-lg bg-slate-50 px-3 py-2 font-mono text-sm font-semibold">{code}</li>)}</ul></div><label className="flex cursor-pointer items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} className="mt-0.5" /><span><strong>ยืนยันข้อมูลก่อนบันทึก</strong><br /><span className="text-xs text-blue-700">ระบบจะสร้างเฉพาะรายการที่ระบุว่า “สร้างใหม่” และกลุ่มเรียนตามรายการด้านบนพร้อมกัน</span></span></label></div>}
+        {step === 5 && <div className="space-y-4">{reviewRow('คณะ', validation.faculty)}{reviewRow('ภาควิชา', validation.department)}{reviewRow('สาขาวิชา', validation.major)}<div className="rounded-xl border border-slate-200 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs text-slate-500">ปีที่เข้าศึกษา</p><p className="font-bold">{validation.admissionYear ? getAdmissionCode(validation.admissionYear) : '—'}</p></div><span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">สร้าง {preview.groupCodes.length} กลุ่ม</span></div><ul className="mt-3 grid gap-2 sm:grid-cols-2">{preview.groupCodes.map((code) => <li key={code} className="rounded-lg bg-slate-50 px-3 py-2 font-mono text-sm font-semibold">{code}</li>)}</ul></div><label className="flex cursor-pointer items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} className="mt-0.5" /><span><strong>ยืนยันข้อมูลก่อนบันทึก</strong><br /><span className="text-xs text-blue-700">ระบบจะสร้างเฉพาะรายการที่ระบุว่า “สร้างใหม่” และกลุ่มเรียนตามรายการด้านบนพร้อมกัน</span></span></label></div>}
 
         {(validation.error || submitError) && <p role="alert" className="rounded-xl border border-red-100 bg-red-50 p-3 text-xs text-red-700">{submitError || validation.error}</p>}
       </form>}

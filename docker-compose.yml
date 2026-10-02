@@ -1,0 +1,72 @@
+name: securelab-system
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    image: securelab-system-backend:dev
+    build: ./backend
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:?Set MIGRATION_DATABASE_URL in .env}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}
+      STORAGE_ROOT: ${STORAGE_ROOT:-/data/securelab}
+    user: '0:0'
+    command: ['securelab', 'migrate']
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./storage/data:/data/securelab
+
+  backend:
+    image: securelab-system-backend:dev
+    build: ./backend
+    environment: &application_environment
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      STORAGE_ROOT: ${STORAGE_ROOT:-/data/securelab}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-http://localhost:3000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      ENABLE_DEVELOPMENT_SIMULATION: ${ENABLE_DEVELOPMENT_SIMULATION:-false}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./storage/data:/data/securelab
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    image: securelab-system-backend:dev
+    command: ['securelab', 'worker']
+    environment: *application_environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - ./storage/data:/data/securelab
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

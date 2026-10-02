@@ -18,7 +18,7 @@ import { Modal } from '../common/Modal';
 import { Student } from '../../types';
 
 export const BiometricReferenceManager: React.FC = () => {
-  const { students, triggerBiometricRetake, showToast, language } = useApp();
+  const { students, showToast, language } = useApp();
   const isThai = language === 'th';
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -42,7 +42,7 @@ export const BiometricReferenceManager: React.FC = () => {
     e.preventDefault();
     if (!selectedStudent) return;
 
-    triggerBiometricRetake(selectedStudent.id, retakeReason);
+    showToast('ยังไม่มีบริการตรวจใบหน้าจริง', 'การขอถ่ายภาพใหม่ยังไม่ถูกส่งไปยังบริการภายนอก', 'info');
     setSelectedStudent(null);
   };
 

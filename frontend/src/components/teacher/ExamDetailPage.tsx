@@ -38,8 +38,8 @@ const DetailRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label,
   </div>
 );
 
-const PolicyRows: React.FC<{ policy: Record<string, boolean> | undefined; labels: Array<[string, string]> }> = ({ policy, labels }) => (
-  <dl className="space-y-3">{policy ? labels.map(([key, label]) => <DetailRow key={key} label={label} value={policy[key] === undefined ? emptyValue : setting(policy[key])} />) : <DetailRow label="สถานะ" value={emptyValue} />}</dl>
+const PolicyRows: React.FC<{ policy: Record<string, unknown> | undefined; labels: Array<[string, string]> }> = ({ policy, labels }) => (
+  <dl className="space-y-3">{policy ? labels.map(([key, label]) => <DetailRow key={key} label={label} value={typeof policy[key] === 'boolean' ? setting(policy[key] as boolean) : emptyValue} />) : <DetailRow label="สถานะ" value={emptyValue} />}</dl>
 );
 
 const formatDate = (date: string) => {

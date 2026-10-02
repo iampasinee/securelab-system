@@ -63,7 +63,7 @@ export const ViolationOverlay: React.FC = () => {
           </div>
 
           <button
-            onClick={() => acknowledgeViolation(activeViolationAlert.id)}
+            onClick={async () => (await acknowledgeViolation(activeViolationAlert.id))}
             className="w-full py-3 px-6 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold shadow-md hover:shadow-lg transition-all focus:outline-hidden focus:ring-4 focus:ring-red-200 cursor-pointer"
           >
             {isThai ? 'รับทราบและกลับสู่การสอบ' : 'I Acknowledge and Return to Exam'}

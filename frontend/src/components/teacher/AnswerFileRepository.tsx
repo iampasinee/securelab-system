@@ -20,8 +20,14 @@ import { Modal } from '../common/Modal';
 import { formatFileSize } from '../../utils/fileSize';
 import { examStatusLabels, getEffectiveExamStatus } from '../../services/examStatus';
 import { useExamClock } from '../../utils/useExamClock';
+import { dataSource } from '../../services/dataSource';
+import { ApiAnswerFileRepository } from './ApiAnswerFileRepository';
 
 export const AnswerFileRepository: React.FC = () => {
+  return dataSource === 'api' ? <ApiAnswerFileRepository /> : <MockAnswerFileRepository />;
+};
+
+const MockAnswerFileRepository: React.FC = () => {
   const now = useExamClock();
   const {
     examSessions,

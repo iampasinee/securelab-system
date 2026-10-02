@@ -1,4 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { api } from '../../services/apiClient';
+import { dataSource } from '../../services/dataSource';
+import { candidateFromApi } from '../../services/apiAdapters';
+import type { ApiCandidate } from '../../types/api';
 import { ArrowLeft, ArrowRight, BookOpen, GraduationCap, Layers3, Search, UserCheck, UserPlus, Users } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { searchStudentsByIdentity, sectionIdOf, studentMatchesSection } from '../../services/courseState';
@@ -22,6 +26,7 @@ export const StudentGroupManager: React.FC = () => {
   const [moveSourceId, setMoveSourceId] = useState('');
   const [destinationId, setDestinationId] = useState('');
   const [error, setError] = useState('');
+  const [apiCandidates, setApiCandidates] = useState<ApiCandidate[]>([]);
 
   // The context has already limited Courses and Sections to this teacher's assignments.
   const selectedCourse = courses.find((course) => course.id === courseId);
@@ -38,8 +43,19 @@ export const StudentGroupManager: React.FC = () => {
     const query = courseSearch.trim().toLocaleLowerCase();
     return query ? courses.filter((course) => `${course.courseCode} ${course.courseName}`.toLocaleLowerCase().includes(query)) : courses;
   }, [courses, courseSearch]);
-  const candidates = useMemo(() => candidateSearch.trim()
-    ? searchStudentsByIdentity(studentDirectory, candidateSearch).slice(0, 30) : [], [studentDirectory, candidateSearch]);
+  const candidates = useMemo(() => dataSource === 'api' ? apiCandidates.map(candidateFromApi) : candidateSearch.trim()
+    ? searchStudentsByIdentity(studentDirectory, candidateSearch).slice(0, 30) : [], [studentDirectory, candidateSearch, apiCandidates]);
+  useEffect(() => {
+    if (dataSource !== 'api' || modal !== 'add') return;
+    setApiCandidates([]);
+    if (candidateSearch.trim().length < 2 || !selectedSectionId) return;
+    let live = true;
+    const timer = window.setTimeout(() => {
+      api.all<ApiCandidate>(`/sections/${selectedSectionId}/roster/candidates?q=${encodeURIComponent(candidateSearch.trim())}`)
+        .then((items) => { if (live) setApiCandidates(items); }).catch((failure) => { if (live) setError(failure.message); });
+    }, 250);
+    return () => { live = false; window.clearTimeout(timer); };
+  }, [candidateSearch, modal, selectedSectionId]);
   const sameOffering = (left: Section, right: Section) => left.academicYear === right.academicYear && String(left.semester) === String(right.semester);
   const destinations = selectedSection ? assignments.filter((item) => item.id !== selectedSectionId && sameOffering(item.section, selectedSection)) : [];
   const movingSource = assignments.find((item) => item.id === moveSourceId);
@@ -50,7 +66,11 @@ export const StudentGroupManager: React.FC = () => {
   const totalStudentCount = new Set(courses.flatMap((course) => course.sections.flatMap((section) => sectionRoster(section).map((student) => student.id)))).size;
   const teacherName = (id?: string) => teachers.find((teacher) => teacher.id === id)?.fullName || '—';
   const isPrimary = (section: Section) => (section.primaryTeacherId || section.teacherId) === currentTeacher?.id;
-  const existingSectionFor = (student: Student) => selectedCourse && findStudentSectionInCourse(student.id, selectedCourse.id, selectedSectionId);
+  const existingSectionFor = (student: Student) => {
+    if (dataSource === 'mock') return selectedCourse && findStudentSectionInCourse(student.id, selectedCourse.id, selectedSectionId);
+    const candidate = apiCandidates.find((item) => item.id === student.id);
+    return candidate?.conflictSectionId ? { sectionId: candidate.conflictSectionId, sectionNo: assignments.find((item) => item.id === candidate.conflictSectionId)?.section.sectionNo || 'อื่น', manageable: Boolean(candidate.canMove) } : null;
+  };
   const majorCode = (student: Student) => academicState.majors.find((item) => item.id === student.majorId)?.code || student.programCode || '—';
   const groupCode = (student: Student) => academicState.classGroups.find((item) => item.id === student.classGroupId)?.code || 'ยังไม่กำหนด';
   const studentContext = (student: Student) => `${majorCode(student)} • ${student.admissionYear ? `ปีที่เข้าศึกษา ${getAdmissionCode(student.admissionYear)}` : 'ไม่ทราบปีที่เข้าศึกษา'} • ${groupCode(student)}`;
@@ -71,13 +91,13 @@ export const StudentGroupManager: React.FC = () => {
     setError('');
     setModal('move');
   };
-  const addStudent = (studentId: string) => {
-    const result = addStudentToSection(studentId, selectedSectionId);
+  const addStudent = async (studentId: string) => {
+    const result = (await addStudentToSection(studentId, selectedSectionId));
     if (result.success) closeModal(); else setError(result.error || 'ไม่สามารถเพิ่มนักศึกษาได้');
   };
-  const moveStudent = () => {
+  const moveStudent = async () => {
     if (!movingStudentId || !destinationId) { setError('กรุณาเลือกนักศึกษาและ Section ปลายทาง'); return; }
-    const result = moveStudentBetweenSections(movingStudentId, moveSourceId, destinationId);
+    const result = (await moveStudentBetweenSections(movingStudentId, moveSourceId, destinationId));
     if (result.success) closeModal(); else setError(result.error || 'ไม่สามารถย้ายนักศึกษาได้');
   };
 
@@ -133,7 +153,7 @@ export const StudentGroupManager: React.FC = () => {
         const alreadyHere = Boolean(selectedSection && studentMatchesSection(student, selectedSection));
         const other = existingSectionFor(student);
         const level = student.admissionYear ? calculateYearLevelFromAdmissionYear(student.admissionYear) : null;
-        return <div key={student.id} className="flex flex-col gap-2 rounded-xl border border-gray-200 p-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-bold text-gray-900">{student.studentCode} • {student.fullName}</p><p className="mt-1 text-[11px] text-gray-500">{studentContext(student)} • {level?.formattedYearLevel || '—'}</p><p className="mt-1 text-[11px] text-gray-500">{alreadyHere ? 'อยู่ใน Section นี้แล้ว' : other ? `ปัจจุบันอยู่ใน Section ${other.sectionNo}` : `ยังไม่ได้อยู่ใน ${selectedCourse?.courseCode}`}</p></div>{alreadyHere ? <button type="button" disabled className="rounded-lg bg-gray-100 px-3 py-2 text-xs text-gray-500">อยู่ใน Section นี้แล้ว</button> : other ? other.manageable ? <button type="button" onClick={() => openMove(student.id, selectedSectionId, other.sectionId)} className="rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800">ย้ายมายัง Section {selectedSection?.sectionNo}</button> : <span className="text-[11px] text-amber-700">ต้องได้รับมอบหมาย Section {other.sectionNo} ก่อนจึงจะย้ายได้</span> : <button type="button" onClick={() => addStudent(student.id)} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">เพิ่มนักศึกษา</button>}</div>;
+        return <div key={student.id} className="flex flex-col gap-2 rounded-xl border border-gray-200 p-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-bold text-gray-900">{student.studentCode} • {student.fullName}</p><p className="mt-1 text-[11px] text-gray-500">{studentContext(student)} • {level?.formattedYearLevel || '—'}</p><p className="mt-1 text-[11px] text-gray-500">{alreadyHere ? 'อยู่ใน Section นี้แล้ว' : other ? `ปัจจุบันอยู่ใน Section ${other.sectionNo}` : `ยังไม่ได้อยู่ใน ${selectedCourse?.courseCode}`}</p></div>{alreadyHere ? <button type="button" disabled className="rounded-lg bg-gray-100 px-3 py-2 text-xs text-gray-500">อยู่ใน Section นี้แล้ว</button> : other ? other.manageable ? <button type="button" onClick={() => openMove(student.id, selectedSectionId, other.sectionId)} className="rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800">ย้ายมายัง Section {selectedSection?.sectionNo}</button> : <span className="text-[11px] text-amber-700">ต้องได้รับมอบหมาย Section {other.sectionNo} ก่อนจึงจะย้ายได้</span> : <button type="button" onClick={async () => (await addStudent(student.id))} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">เพิ่มนักศึกษา</button>}</div>;
       })}{candidateSearch.trim() && !candidates.length && <p className="py-8 text-center text-sm text-gray-500">ไม่พบนักศึกษาในระบบ</p>}{!candidateSearch.trim() && <p className="py-8 text-center text-xs text-gray-500">พิมพ์รหัสนักศึกษา ชื่อ หรืออีเมลเพื่อค้นหา</p>}</div>
     </Modal>
     <Modal isOpen={modal === 'move'} onClose={closeModal} title="ย้ายนักศึกษา" maxWidth="md" footer={<><button type="button" onClick={closeModal} className="rounded-xl border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700">ยกเลิก</button><button type="button" onClick={moveStudent} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white">ยืนยันการย้าย</button></>}>

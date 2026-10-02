@@ -211,13 +211,13 @@ export const SimulationToolbar: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-1.5 pt-1">
                 <button
-                  onClick={() => adjustExamTime('exam_0001', 5, 'room', undefined, 'Simulator quick +5m')}
+                  onClick={async () => (await adjustExamTime('exam_0001', 5, 'room', undefined, 'Simulator quick +5m'))}
                   className="py-1.5 px-2 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-center font-medium cursor-pointer"
                 >
                   {isThai ? '+5 นาที' : '+5 Mins'}
                 </button>
                 <button
-                  onClick={() => reopenSubmission('exam_0001', 15, 'room', undefined, 'Simulator reopen')}
+                  onClick={async () => (await reopenSubmission('exam_0001', 15, 'room', undefined, 'Simulator reopen'))}
                   className="py-1.5 px-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-center font-medium cursor-pointer"
                 >
                   {isThai ? 'เปิดส่งซ้ำ +15 นาที' : 'Reopen +15m'}

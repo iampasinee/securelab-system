@@ -29,6 +29,7 @@ export type CourseStatus = 'active' | 'inactive';
 export type CourseSemester = 1 | 2 | 'summer';
 
 export interface CourseInput {
+  expectedVersion?: number;
   code: string;
   name: string;
   facultyId: string;
@@ -37,6 +38,7 @@ export interface CourseInput {
 }
 
 export interface SectionInput {
+  expectedVersion?: number;
   courseId: string;
   sectionNumber: number;
   semester: CourseSemester;

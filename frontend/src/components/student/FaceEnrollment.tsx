@@ -99,9 +99,9 @@ export const FaceEnrollment: React.FC = () => {
     setFaceDetected(false);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!capturedImage || !currentStudent) return;
-    updateFaceReference(currentStudent.id, capturedImage);
+    (await updateFaceReference(currentStudent.id, capturedImage));
     setActiveStudentStep('ST3'); // Continue to Exam Info & Rules
   };
 

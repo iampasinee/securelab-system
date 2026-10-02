@@ -7,7 +7,7 @@ import { resolveAcademicGroupId } from '../data/academicStructure';
 import { getEffectiveExamStatus } from './examStatus';
 
 const stamp = '2026-09-17T00:00:00.000Z';
-export const courseOfferingSettings = { currentSemester: 1 as const };
+export const courseOfferingSettings = { currentSemester: 1 as 1 | 2 | 'summer' };
 const normalizeYear = (year: number) => year > 0 && year < 2500 ? year + 543 : year;
 export const sectionIdOf = (courseId: string, section: Course['sections'][number]) =>
   section.id || `section-${courseId}-${normalizeYear(section.academicYear)}-${section.semester}-${section.sectionNo}`;
@@ -256,7 +256,7 @@ export const snapshotAffectedExamRosters = (
   return exams.map((exam) => {
     if (getEffectiveExamStatus(exam, now) === 'upcoming' || exam.eligibleStudentIds) return exam;
     const course = courses.find((item) => item.id === exam.courseId);
-    const section = course?.sections.find((item) => item.sectionNo === exam.sectionNo);
+    const section = course?.sections.find((item) => (exam.sectionId ? item.id === exam.sectionId : item.sectionNo === exam.sectionNo));
     if (!course || !section || !affected.has(sectionIdOf(course.id, section))) return exam;
     return { ...exam, eligibleStudentIds: students.filter((student) => studentMatchesSection(student, section)).map((student) => student.id) };
   });
@@ -267,7 +267,7 @@ export const enrollmentExamReferenceError = (exams: ExamSession[], courses: Cour
     const located = findSection(courses, id);
     if (!located) continue;
     const duplicateSectionNumbers = located.course.sections.filter((section) => section.sectionNo === located.section.sectionNo);
-    if (duplicateSectionNumbers.length > 1 && exams.some((exam) => exam.courseId === located.course.id && exam.sectionNo === located.section.sectionNo)) {
+    if (duplicateSectionNumbers.length > 1 && exams.some((exam) => !exam.sectionId && exam.courseId === located.course.id && exam.sectionNo === located.section.sectionNo)) {
       return 'รายวิชานี้มี Section หมายเลขเดียวกันหลายภาคการศึกษา และการสอบยังไม่ได้อ้างอิง Section ID จึงไม่สามารถปรับรายชื่อเฉพาะรายได้อย่างปลอดภัย';
     }
   }
@@ -388,7 +388,7 @@ export const courseDeleteError = (course: Course, exams: ExamSession[]) =>
     ? 'ไม่สามารถลบรายวิชานี้ได้ เนื่องจากมีตอนเรียนหรือข้อมูลการสอบอ้างอิงอยู่ กรุณาปิดใช้งานแทน' : undefined;
 
 export const sectionDeleteError = (course: Course, section: Course['sections'][number], exams: ExamSession[]) =>
-  exams.some((exam) => exam.courseId === course.id && exam.sectionNo === section.sectionNo)
+  exams.some((exam) => (exam.sectionId ? exam.sectionId === section.id : exam.courseId === course.id && exam.sectionNo === section.sectionNo))
     ? 'ไม่สามารถลบตอนเรียนนี้ได้ เนื่องจากมีข้อมูลการสอบอ้างอิงอยู่ กรุณาปิดใช้งานแทน' : undefined;
 
 export const coursesForTeacher = (courses: Course[], teacherId?: string) => !teacherId ? [] : courses
@@ -398,6 +398,6 @@ export const coursesForTeacher = (courses: Course[], teacherId?: string) => !tea
 export const coursesForStudent = (courses: Course[], student?: Student | null, exams: ExamSession[] = [], now = new Date()) =>
   !student ? [] : courses
     .map((course) => ({ ...course, sections: course.sections.filter((section) =>
-      studentMatchesSection(student, section) || exams.some((exam) => exam.courseId === course.id && exam.sectionNo === section.sectionNo &&
+      studentMatchesSection(student, section) || exams.some((exam) => (exam.sectionId ? exam.sectionId === section.id : exam.courseId === course.id && exam.sectionNo === section.sectionNo) &&
         getEffectiveExamStatus(exam, now) !== 'upcoming' && exam.eligibleStudentIds?.includes(student.id))) }))
     .filter((course) => course.sections.length);

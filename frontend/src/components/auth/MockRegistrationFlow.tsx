@@ -187,7 +187,7 @@ export const MockRegistrationFlow: React.FC<MockRegistrationFlowProps> = ({ onBa
     setStep(5);
   };
 
-  const confirmRegistration = () => {
+  const confirmRegistration = async () => {
     if (!canEnterRegistrationStep(5, target, password, confirmation)) {
       setError('กรุณาตั้งรหัสผ่านให้ตรงตามเงื่อนไขก่อน');
       setStep(2);
@@ -210,7 +210,7 @@ export const MockRegistrationFlow: React.FC<MockRegistrationFlowProps> = ({ onBa
         setError('ไม่สามารถอ่านรหัสนักศึกษาจากอีเมลนี้ได้');
         return;
       }
-      profileSaved = updateStudent(target.subjectId, {
+      profileSaved = (await updateStudent(target.subjectId, {
         email: target.email,
         studentCode: parsedStudentEmail.studentId,
         fullName,
@@ -221,16 +221,16 @@ export const MockRegistrationFlow: React.FC<MockRegistrationFlowProps> = ({ onBa
         classGroupId: info.classGroupId || undefined,
         faceReferenceStatus: 'available',
         isFirstTime: false,
-      });
+      }));
     } else if (target.role === 'teacher') {
-      profileSaved = updateTeacher(target.subjectId, {
+      profileSaved = (await updateTeacher(target.subjectId, {
         email: target.email,
         teacherCode: info.code.trim(),
         fullName,
         facultyId: info.facultyId,
         departmentId: info.departmentId,
         icitProfileStatus: 'confirmed',
-      });
+      }));
     }
     if (!profileSaved) {
       setError('ไม่สามารถบันทึกข้อมูลผู้ใช้ได้ กรุณาตรวจสอบข้อมูลอีกครั้ง');

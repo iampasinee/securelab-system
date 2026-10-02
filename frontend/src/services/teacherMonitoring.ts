@@ -57,7 +57,7 @@ export const getAuthorizedMonitoringExams = (
   teacherCourses: Course[],
 ): TeacherMonitoringExam[] => examSessions.flatMap((exam) => {
   const course = teacherCourses.find((candidate) => candidate.id === exam.courseId);
-  const section = course?.sections.find((candidate) => candidate.sectionNo === exam.sectionNo);
+  const section = course?.sections.find((candidate) => (exam.sectionId ? candidate.id === exam.sectionId : candidate.sectionNo === exam.sectionNo));
   return course && section ? [{ exam, course, section }] : [];
 });
 

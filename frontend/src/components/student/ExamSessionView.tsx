@@ -635,9 +635,9 @@ export const ExamSessionView: React.FC = () => {
 
       if (step === 4) {
         clearInterval(interval);
-        setTimeout(() => {
+        setTimeout(async () => {
           setIsCheckingIntegrity(false);
-          const accepted = submitStudentFiles(
+          const accepted = (await submitStudentFiles(
             activeExam.id,
             currentStudent.id,
             readyFiles.map((file) => ({
@@ -645,7 +645,7 @@ export const ExamSessionView: React.FC = () => {
               submissionName: file.submissionName,
               sizeBytes: file.sizeBytes,
             }))
-          );
+          ));
           if (accepted) {
             setAttemptReceipt({ submittedAt: new Date().toISOString(), files: readyFiles });
             markFilesSubmitted(readyFiles);
@@ -687,7 +687,7 @@ export const ExamSessionView: React.FC = () => {
     return 'bg-red-50 text-red-700 border-red-200';
   };
 
-  const finalizeTimedOutSubmission = (files: StagedUploadRecord[]) => {
+  const finalizeTimedOutSubmission = async (files: StagedUploadRecord[]) => {
     if (!activeExam || !currentStudent) return;
     const integrityFailures = files.filter(
       (file) => file.status === 'ready' && !isIntegrityValid(file)
@@ -709,7 +709,7 @@ export const ExamSessionView: React.FC = () => {
       return;
     }
 
-    const accepted = submitStudentFiles(
+    const accepted = (await submitStudentFiles(
       activeExam.id,
       currentStudent.id,
       filesToSubmit.map((file) => ({
@@ -717,7 +717,7 @@ export const ExamSessionView: React.FC = () => {
         submissionName: file.submissionName,
         sizeBytes: file.sizeBytes,
       }))
-    );
+    ));
 
     if (accepted) {
       setPreviewUploadId(null);

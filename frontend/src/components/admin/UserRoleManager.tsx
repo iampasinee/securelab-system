@@ -34,6 +34,7 @@ interface UserRoleManagerProps {
 }
 
 interface UnifiedUser {
+  rowVersion?: number;
   id: string;
   code: string;
   name: string;
@@ -121,6 +122,7 @@ const GeneralUserRoleManager: React.FC<UserRoleManagerProps> = ({ view }) => {
   const allUsers = useMemo<UnifiedUser[]>(() => [
     ...students.map((student) => ({
       id: student.id,
+      rowVersion: student.rowVersion,
       code: student.studentCode,
       name: student.fullName,
       email: student.email,
@@ -138,6 +140,7 @@ const GeneralUserRoleManager: React.FC<UserRoleManagerProps> = ({ view }) => {
       const faculty = academicState.faculties.find((item) => item.id === department?.facultyId);
       return {
         id: teacher.id,
+        rowVersion: teacher.rowVersion,
         code: teacher.teacherCode,
         name: teacher.fullName,
         email: teacher.email,
@@ -156,6 +159,7 @@ const GeneralUserRoleManager: React.FC<UserRoleManagerProps> = ({ view }) => {
     }),
     ...admins.map((admin) => ({
       id: admin.id,
+      rowVersion: admin.rowVersion,
       code: admin.adminCode,
       name: admin.fullName,
       email: admin.email,
@@ -270,33 +274,37 @@ const GeneralUserRoleManager: React.FC<UserRoleManagerProps> = ({ view }) => {
     });
   };
 
-  const saveEdit = (event: React.FormEvent) => {
+  const saveEdit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!editUser) return;
     if (editUser.role === 'student') {
-      const accepted = updateStudent(editUser.id, {
+      const accepted = (await updateStudent(editUser.id, {
+        rowVersion: editUser.rowVersion,
         studentCode: editForm.code.trim(),
         fullName: editForm.name.trim(),
         email: editForm.email.trim(),
         faculty: editForm.faculty.trim(),
         department: editForm.department.trim(),
-      });
+      }));
       if (!accepted) return;
     } else if (editUser.role === 'teacher') {
-      const accepted = updateTeacher(editUser.id, {
+      const accepted = (await updateTeacher(editUser.id, {
+        rowVersion: editUser.rowVersion,
         teacherCode: editForm.code.trim(),
         fullName: editForm.name.trim(),
         email: editForm.email.trim(),
         facultyId: editForm.facultyId,
         departmentId: editForm.departmentId,
-      });
+      }));
       if (!accepted) return;
     } else {
-      updateAdmin(editUser.id, {
+      const accepted = (await updateAdmin(editUser.id, {
+        rowVersion: editUser.rowVersion,
         adminCode: editForm.code.trim(),
         fullName: editForm.name.trim(),
         email: editForm.email.trim(),
-      });
+      }));
+      if (accepted === false) return;
     }
     setEditUser(null);
   };
@@ -308,26 +316,25 @@ const GeneralUserRoleManager: React.FC<UserRoleManagerProps> = ({ view }) => {
     setStatusReason('');
   };
 
-  const applyStatus = (event: React.FormEvent) => {
+  const applyStatus = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!statusUser || isCurrentAdmin(statusUser)) return;
-    if (statusUser.role === 'student') {
-      updateAccountStatus(statusUser.id, statusTarget, statusReason.trim() || undefined);
-    } else if (statusUser.role === 'teacher') {
-      updateTeacher(statusUser.id, { accountStatus: statusTarget });
-    } else {
-      updateAdmin(statusUser.id, { accountStatus: statusTarget });
-    }
+    const accepted = statusUser.role === 'student'
+      ? await updateAccountStatus(statusUser.id, statusTarget, statusReason.trim() || undefined, statusUser.rowVersion)
+      : statusUser.role === 'teacher'
+        ? await updateTeacher(statusUser.id, { accountStatus: statusTarget, rowVersion: statusUser.rowVersion })
+        : await updateAdmin(statusUser.id, { accountStatus: statusTarget, rowVersion: statusUser.rowVersion });
+    if (accepted === false) return;
     setStatusUser(null);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteUser || isCurrentAdmin(deleteUser)) return;
     const deleted = deleteUser.role === 'student'
-      ? deleteStudent(deleteUser.id)
+      ? (await deleteStudent(deleteUser.id))
       : deleteUser.role === 'teacher'
-      ? deleteTeacher(deleteUser.id)
-      : deleteAdmin(deleteUser.id);
+      ? (await deleteTeacher(deleteUser.id))
+      : (await deleteAdmin(deleteUser.id));
     if (deleted) setDeleteUser(null);
   };
 
@@ -342,12 +349,12 @@ const GeneralUserRoleManager: React.FC<UserRoleManagerProps> = ({ view }) => {
     setCreateForm(createEmptyForm());
   };
 
-  const createUser = (event: React.FormEvent) => {
+  const createUser = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!createRole) return;
     if (createRole === 'student') return;
     if (createRole === 'teacher') {
-      const accepted = addTeacher({
+      const accepted = (await addTeacher({
         teacherCode: createForm.code.trim(),
         fullName: createForm.name.trim(),
         email: createForm.email.trim(),
@@ -358,16 +365,17 @@ const GeneralUserRoleManager: React.FC<UserRoleManagerProps> = ({ view }) => {
         role: 'teacher',
         icitProfileStatus: 'confirmed',
         accountStatus: 'active',
-      });
+      }));
       if (!accepted) return;
     } else {
-      addAdmin({
+      const accepted = (await addAdmin({
         adminCode: createForm.code.trim(),
         fullName: createForm.name.trim(),
         email: createForm.email.trim(),
         role: 'admin',
         accountStatus: 'active',
-      });
+      }));
+      if (accepted === false) return;
     }
     closeCreateModal();
   };

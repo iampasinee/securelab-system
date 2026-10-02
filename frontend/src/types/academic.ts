@@ -1,6 +1,7 @@
 export type AcademicStatus = 'active' | 'inactive';
 
 interface AcademicRecordBase {
+  rowVersion?: number;
   id: string;
   status: AcademicStatus;
   updatedAt: string;
@@ -30,6 +31,7 @@ export interface AcademicState {
 export type AcademicTier = 'faculties' | 'departments' | 'majors' | 'classGroups';
 export type AcademicRecord = AcademicState[AcademicTier][number];
 export interface AcademicInput {
+  expectedVersion?: number;
   name: string;
   code: string;
   facultyId: string;

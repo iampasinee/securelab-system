@@ -40,12 +40,17 @@ import { MonitoringDatePickerPopover } from './MonitoringDatePickerPopover';
 import { useExamClock } from '../../utils/useExamClock';
 import { canAdjustExamTime, canReopenExamSubmissions, examStatusLabels } from '../../services/examStatus';
 import { getDemoTimeState, subscribeDemoTime } from '../../services/demoTime';
+import { dataSource } from '../../services/dataSource';
+import { ApiExamMonitoringDetail } from './ApiExamMonitoringDetail';
+import { getBangkokDateInputValue } from '../../services/serverClock';
+
+const getMonitoringDateValue = (date?: Date) => dataSource === 'api' ? getBangkokDateInputValue(date) : getLocalDateInputValue(date);
 
 export const LiveExamMonitoring: React.FC = () => {
   const now = useExamClock();
   const demoTime = useSyncExternalStore(subscribeDemoTime, getDemoTimeState, getDemoTimeState);
   const [selectedExamSessionId, setSelectedExamSessionId] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState(() => getLocalDateInputValue());
+  const [selectedDate, setSelectedDate] = useState(() => getMonitoringDateValue());
   const [monitoringView, setMonitoringView] = useState<MonitoringView>(defaultMonitoringView);
   const [statusFilter, setStatusFilter] = useState<'all' | ExamSessionStatus>('all');
   const [courseFilter, setCourseFilter] = useState('');
@@ -53,12 +58,13 @@ export const LiveExamMonitoring: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    setSelectedDate(getLocalDateInputValue(demoTime.enabled && demoTime.simulatedNow !== null
-      ? new Date(demoTime.simulatedNow) : new Date()));
+    setSelectedDate(getMonitoringDateValue(dataSource === 'mock' && demoTime.enabled && demoTime.simulatedNow !== null
+      ? new Date(demoTime.simulatedNow) : undefined));
     setMonitoringView('daily');
   }, [demoTime.enabled, demoTime.simulatedNow]);
 
   if (selectedExamSessionId) {
+    if (dataSource === 'api') return <ApiExamMonitoringDetail examSessionId={selectedExamSessionId} onBack={() => setSelectedExamSessionId(null)} />;
     return (
       <ExamMonitoringDetail
         examSessionId={selectedExamSessionId}
@@ -207,8 +213,8 @@ const DailyExamOverview: React.FC<DailyExamOverviewProps> = ({
 
         <div className="mt-3 grid grid-cols-2 gap-2 text-center text-[10px] sm:grid-cols-4">
           <div className="rounded-xl border border-gray-100 bg-slate-50 px-2 py-2"><span className="block text-gray-500">ผู้มีสิทธิ์</span><strong className="text-sm text-gray-900">{eligibleStudents.length}</strong></div>
-          <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-2 py-2"><span className="block text-emerald-600">เข้าสอบแล้ว</span><strong className="text-sm text-emerald-900">{enteredStudentIds.size}</strong></div>
-          <div className="rounded-xl border border-amber-100 bg-amber-50 px-2 py-2"><span className="block text-amber-600">ยังไม่เข้า</span><strong className="text-sm text-amber-900">{Math.max(eligibleStudents.length - enteredStudentIds.size, 0)}</strong></div>
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-2 py-2"><span className="block text-emerald-600">{dataSource === 'api' ? 'มีที่นั่งแล้ว' : 'เข้าสอบแล้ว'}</span><strong className="text-sm text-emerald-900">{enteredStudentIds.size}</strong></div>
+          <div className="rounded-xl border border-amber-100 bg-amber-50 px-2 py-2"><span className="block text-amber-600">{dataSource === 'api' ? 'ยังไม่มีที่นั่ง' : 'ยังไม่เข้า'}</span><strong className="text-sm text-amber-900">{Math.max(eligibleStudents.length - enteredStudentIds.size, 0)}</strong></div>
           <div className="rounded-xl border border-blue-100 bg-blue-50 px-2 py-2"><span className="block text-blue-600">ส่งคำตอบ</span><strong className="text-sm text-blue-900">{submittedStudentIds.size}</strong></div>
         </div>
 
@@ -261,7 +267,7 @@ const DailyExamOverview: React.FC<DailyExamOverviewProps> = ({
 
       {monitoringView === 'calendar' ? <MonitoringCalendar exams={authorizedExams} selectedDate={selectedDate} onSelectDate={onSelectedDateChange} onShowDaily={() => onMonitoringViewChange('daily')} /> : <>
         <section className="flex flex-col gap-4 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-white p-4 shadow-xs lg:flex-row lg:items-center lg:justify-between">
-          <div><p className="text-xs font-bold text-blue-600">กำหนดการสอบประจำวันที่ {formatThaiDate(selectedDate)}</p><h2 className="mt-1 text-xl font-bold text-gray-950">{selectedDate === getLocalDateInputValue(now) ? 'วันนี้' : 'วันที่เลือก'}มีการสอบ {statusCounts.all} รายการ</h2><p className="mt-1 flex items-center gap-1.5 text-[11px] text-gray-500"><GraduationCap className="h-4 w-4 text-blue-600" />อาจารย์ผู้คุมสอบ: <strong className="text-gray-700">{currentTeacher?.fullName || '—'}</strong> (แสดงเฉพาะรายวิชาและตอนเรียนที่ท่านได้รับมอบหมาย)</p></div>
+          <div><p className="text-xs font-bold text-blue-600">กำหนดการสอบประจำวันที่ {formatThaiDate(selectedDate)}</p><h2 className="mt-1 text-xl font-bold text-gray-950">{selectedDate === getMonitoringDateValue(now) ? 'วันนี้' : 'วันที่เลือก'}มีการสอบ {statusCounts.all} รายการ</h2><p className="mt-1 flex items-center gap-1.5 text-[11px] text-gray-500"><GraduationCap className="h-4 w-4 text-blue-600" />อาจารย์ผู้คุมสอบ: <strong className="text-gray-700">{currentTeacher?.fullName || '—'}</strong> (แสดงเฉพาะรายวิชาและตอนเรียนที่ท่านได้รับมอบหมาย)</p></div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{([['all', 'ทั้งหมด'], ['in_progress', 'กำลังสอบ'], ['upcoming', 'กำลังจะเริ่ม'], ['completed', 'เสร็จสิ้น']] as Array<['all' | ExamSessionStatus, string]>).map(([status, label]) => <button key={status} type="button" onClick={() => onStatusFilterChange(status)} className={`min-w-24 rounded-xl border px-3 py-2 text-center transition-all ${statusFilter === status ? 'border-blue-500 bg-white text-blue-700 ring-2 ring-blue-500/15' : 'border-gray-200 bg-white/80 text-gray-600 hover:border-blue-200'}`}><span className="block text-[10px] font-medium">{label}</span><strong className="mt-0.5 block text-lg text-gray-900">{statusCounts[status]}</strong></button>)}</div>
         </section>
 
@@ -276,7 +282,7 @@ const DailyExamOverview: React.FC<DailyExamOverviewProps> = ({
         </section>
 
         <section className="grid gap-4 lg:grid-cols-2" aria-live="polite">
-          {filteredExams.length > 0 ? filteredExams.map(renderExamCard) : <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-14 text-center lg:col-span-2"><CalendarDays className="mx-auto h-10 w-10 text-gray-300" /><h2 className="mt-3 text-base font-bold text-gray-900">{examsOnSelectedDate.length ? 'ไม่พบรายการตามตัวกรอง' : 'ไม่มีการสอบในวันที่เลือก'}</h2><p className="mt-1 text-xs text-gray-500">ลองเลือกวันที่อื่น หรือปรับตัวกรอง</p><div className="mt-4 flex flex-wrap justify-center gap-2"><button type="button" onClick={() => { onSelectedDateChange(getLocalDateInputValue(now)); clearFilters(); }} className="min-h-9 rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white hover:bg-blue-700">กลับไปวันนี้</button><button type="button" onClick={() => onMonitoringViewChange('calendar')} className="min-h-9 rounded-xl border border-gray-300 bg-white px-4 text-xs font-semibold text-gray-700 hover:bg-gray-50">เปิดปฏิทิน</button></div></div>}
+          {filteredExams.length > 0 ? filteredExams.map(renderExamCard) : <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-14 text-center lg:col-span-2"><CalendarDays className="mx-auto h-10 w-10 text-gray-300" /><h2 className="mt-3 text-base font-bold text-gray-900">{examsOnSelectedDate.length ? 'ไม่พบรายการตามตัวกรอง' : 'ไม่มีการสอบในวันที่เลือก'}</h2><p className="mt-1 text-xs text-gray-500">ลองเลือกวันที่อื่น หรือปรับตัวกรอง</p><div className="mt-4 flex flex-wrap justify-center gap-2"><button type="button" onClick={() => { onSelectedDateChange(getMonitoringDateValue(now)); clearFilters(); }} className="min-h-9 rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white hover:bg-blue-700">กลับไปวันนี้</button><button type="button" onClick={() => onMonitoringViewChange('calendar')} className="min-h-9 rounded-xl border border-gray-300 bg-white px-4 text-xs font-semibold text-gray-700 hover:bg-gray-50">เปิดปฏิทิน</button></div></div>}
         </section>
       </>}
     </div>
@@ -426,29 +432,29 @@ const ExamMonitoringDetail: React.FC<ExamMonitoringDetailProps> = ({ examSession
     else if (res.status === 'offline') offlineCount++;
   });
 
-  const handleApplyTimeControl = (e: React.FormEvent) => {
+  const handleApplyTimeControl = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!timeControlReason || !canAdjustExamTime(activeExam, new Date())) return;
-    adjustExamTime(
+    (await adjustExamTime(
       activeExam.id,
       timeControlDelta,
       timeControlScope,
       timeControlScope === 'student' ? timeControlTargetStudent : undefined,
       timeControlReason
-    );
+    ));
     setShowTimeControlModal(false);
   };
 
-  const handleApplyReopen = (e: React.FormEvent) => {
+  const handleApplyReopen = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reopenReason || !canReopenExamSubmissions(activeExam, new Date())) return;
-    reopenSubmission(
+    (await reopenSubmission(
       activeExam.id,
       reopenMinutes,
       reopenScope,
       reopenScope === 'student' ? reopenTargetStudent : undefined,
       reopenReason
-    );
+    ));
     setShowReopenModal(false);
   };
 
@@ -973,14 +979,14 @@ const ExamMonitoringDetail: React.FC<ExamMonitoringDetailProps> = ({ examSession
                 <button
                   type="button"
                   disabled={!canAdjustTime}
-                  onClick={() => {
-                    adjustExamTime(
+                  onClick={async () => {
+                    (await adjustExamTime(
                       activeExam.id,
                       5,
                       'student',
                       selectedStudentForDetail.student.id,
                       isThai ? 'ชดเชยเวลาเครื่องหน่วงเฉพาะรายบุคคล' : 'Individual station latency grace'
-                    );
+                    ));
                     setSelectedStudentForDetail(null);
                   }}
                   className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
@@ -990,14 +996,14 @@ const ExamMonitoringDetail: React.FC<ExamMonitoringDetailProps> = ({ examSession
                 <button
                   type="button"
                   disabled={!canReopen}
-                  onClick={() => {
-                    reopenSubmission(
+                  onClick={async () => {
+                    (await reopenSubmission(
                       activeExam.id,
                       15,
                       'student',
                       selectedStudentForDetail.student.id,
                       isThai ? 'เปิดสิทธิ์ส่งใหม่เนื่องจากเครื่องรีสตาร์ต' : 'Individual equipment restart'
-                    );
+                    ));
                     setSelectedStudentForDetail(null);
                   }}
                   className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-[11px] cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"

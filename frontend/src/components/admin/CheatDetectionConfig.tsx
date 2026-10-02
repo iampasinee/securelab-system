@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { Badge } from '../common/Badge';
 import { CheatDetectionRules } from '../../types';
+import { dataSource } from '../../services/dataSource';
+import { ApiSecuritySettings } from './ApiSecuritySettings';
 
 const defaultRules: CheatDetectionRules = {
   multipleFaceDetection: true,
@@ -26,6 +28,10 @@ const defaultRules: CheatDetectionRules = {
 };
 
 export const CheatDetectionConfig: React.FC = () => {
+  return dataSource === 'api' ? <ApiSecuritySettings /> : <MockCheatDetectionConfig />;
+};
+
+const MockCheatDetectionConfig: React.FC = () => {
   const {
     securityRules,
     updateSecurityRules,
@@ -53,9 +59,9 @@ export const CheatDetectionConfig: React.FC = () => {
     setConfig((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handleSaveConfig = (e: React.FormEvent) => {
+  const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateSecurityRules(config);
+    (await updateSecurityRules(config));
     showToast(
       isThai ? 'บันทึกกฎระเบียบแล้ว' : 'Rules Saved',
       isThai
@@ -310,7 +316,7 @@ export const CheatDetectionConfig: React.FC = () => {
                     <td className="px-6 py-3.5 text-right">
                       {!vio.acknowledged ? (
                         <button
-                          onClick={() => acknowledgeViolation(vio.id)}
+                          onClick={async () => (await acknowledgeViolation(vio.id))}
                           className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-semibold text-[11px] rounded-lg shadow-xs transition-colors cursor-pointer"
                         >
                           {isThai ? 'รับทราบ' : 'Acknowledge'}

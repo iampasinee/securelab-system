@@ -15,7 +15,9 @@ import {
 } from 'lucide-react';
 import { Badge } from '../common/Badge';
 import { Modal } from '../common/Modal';
-import { AuditLogEntry } from '../../types';
+import { AuditLog } from '../../types';
+import { dataSource } from '../../services/dataSource';
+import { api } from '../../services/apiClient';
 
 export const SystemAuditLog: React.FC = () => {
   const { auditLogs, showToast, language } = useApp();
@@ -23,7 +25,7 @@ export const SystemAuditLog: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
-  const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
   const filteredLogs = auditLogs.filter((log) => {
     if (roleFilter !== 'all' && log.role !== roleFilter) return false;
@@ -37,6 +39,10 @@ export const SystemAuditLog: React.FC = () => {
   });
 
   const handleExportCSV = () => {
+    if (dataSource === 'api') {
+      void api.download(`/admin/audit-logs/export?q=${encodeURIComponent(searchTerm)}`, 'SecureLab_Audit.csv').catch((failure) => showToast('ส่งออกไม่สำเร็จ', failure.message, 'error'));
+      return;
+    }
     showToast(
       isThai ? 'เริ่มการส่งออกข้อมูล' : 'Export Initiated',
       isThai
@@ -218,7 +224,7 @@ export const SystemAuditLog: React.FC = () => {
             </div>
 
             <div className="p-3 bg-blue-50 rounded-xl border border-blue-200 text-blue-900 text-[11px]">
-              {isThai
+              {dataSource === 'api' ? 'บันทึกเหตุการณ์แบบเพิ่มรายการใหม่ ไม่อ้างว่าเป็นลายมือชื่อดิจิทัลหรือ HMAC' : isThai
                 ? 'ลงลายมือชื่อดิจิทัลเข้ารหัสด้วย ICIT HMAC ของสถาบันเพื่อตรวจจับการแก้ไขดัดแปลงทางนิติวิทยาศาสตร์'
                 : 'Cryptographically signed with institutional ICIT HMAC for forensic tamper detection.'}
             </div>

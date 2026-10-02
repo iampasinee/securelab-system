@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { ShieldCheck, LogOut, Bell, ChevronRight, Menu } from 'lucide-react';
 import { Badge } from './Badge';
 import { DemoTimeIndicator } from '../simulation/DemoTimeControl';
+import { dataSource } from '../../services/dataSource';
 
 interface HeaderProps {
   onAdminMenuToggle?: () => void;
@@ -110,8 +111,8 @@ export const Header: React.FC<HeaderProps> = ({ onAdminMenuToggle, onTeacherMenu
       {/* Right User & Actions */}
       <div className="flex items-center gap-3">
         {role !== 'student' && <>
-          <DemoTimeIndicator compact className="max-w-24 lg:hidden" />
-          <DemoTimeIndicator className="hidden max-w-44 lg:inline-flex" />
+          {dataSource === 'mock' && <DemoTimeIndicator compact className="max-w-24 lg:hidden" />}
+          {dataSource === 'mock' && <DemoTimeIndicator className="hidden max-w-44 lg:inline-flex" />}
         </>}
         {/* Violation alert counter for teacher */}
         {role === 'teacher' && (

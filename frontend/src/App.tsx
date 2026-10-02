@@ -1,5 +1,12 @@
+import { ApiAcademicSettings } from './components/admin/ApiAcademicSettings';
 import React, { useEffect, useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { ApiAppProvider } from './context/ApiAppProvider';
+import { dataSource } from './services/dataSource';
+import { ApiLoginLanding } from './components/auth/ApiLoginLanding';
+import { ApiStudentFlow } from './components/student/ApiStudentFlow';
+import { ApiAccountActions } from './components/common/ApiAccountActions';
+import { ApiOverview } from './components/common/ApiOverview';
 import { ToastContainer } from './components/common/ToastContainer';
 import { Header } from './components/common/Header';
 import { SecureLabBrandHeader } from './components/common/SecureLabBrandHeader';
@@ -91,11 +98,12 @@ const MainRouter: React.FC = () => {
 
   // 1. Unauthenticated SSO Landing (Screen S0)
   if (!role) {
-    return <LoginLanding />;
+    return dataSource === 'api' ? <ApiLoginLanding /> : <LoginLanding />;
   }
 
   // 2. Student Flow (Screens ST1 -> ST7 + ST8 Violation Overlay)
   if (role === 'student') {
+    if (dataSource === 'api') return <ApiStudentFlow />;
     const isExamSessionStep = activeStudentStep === 'ST4' ||
       activeStudentStep === 'ST5' ||
       activeStudentStep === 'ST6' ||
@@ -146,7 +154,7 @@ const MainRouter: React.FC = () => {
 
           <main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
             <div className="max-w-7xl mx-auto">
-              {activeTeacherRoute === 'T1' && <TeacherDashboard />}
+              {activeTeacherRoute === 'T1' && (dataSource === 'api' ? <ApiOverview /> : <TeacherDashboard />)}
               {activeTeacherRoute === 'T2' && <CourseExamSessionManager />}
               {activeTeacherRoute === 'T3' && <StudentGroupManager />}
               {activeTeacherRoute === 'T4' && <SeatAssignmentManager />}
@@ -179,17 +187,17 @@ const MainRouter: React.FC = () => {
 
           <main className="min-w-0 flex-1 overflow-y-auto p-6 md:p-8">
             <div className="max-w-7xl mx-auto">
-              {activeAdminRoute === 'A1' && <AdminDashboard />}
+              {activeAdminRoute === 'A1' && (dataSource === 'api' ? <ApiOverview /> : <AdminDashboard />)}
               {isUserManagementRoute(activeAdminRoute) && (
                 <UserRoleManager view={getUserManagementView(activeAdminRoute)} />
               )}
-              {activeAdminRoute === 'ACADEMIC' && <FacultiesAndGroupsPage />}
+              {activeAdminRoute === 'ACADEMIC' && <>{dataSource === 'api' && <ApiAcademicSettings />}<FacultiesAndGroupsPage /></>}
               {activeAdminRoute === 'COURSES' && <CoursesAndSectionsPage />}
               {(activeAdminRoute === 'A4' || activeAdminRoute === 'A5') && (
                 <RoomComputerSetup />
               )}
               {(activeAdminRoute === 'A6' || activeAdminRoute === 'A7') && (
-                <BiometricReferenceManager />
+                dataSource === 'api' ? <div className="rounded-2xl border bg-white p-6"><h1 className="text-xl font-semibold">จัดการข้อมูลใบหน้า</h1><p className="mt-3 text-sm text-gray-600">ยังไม่มีการเชื่อมต่อบริการตรวจใบหน้าจริงในระบบนี้ ข้อมูลภาพจาก mock mode ไม่ถูกส่งเข้า backend</p></div> : <BiometricReferenceManager />
               )}
               {(activeAdminRoute === 'A8' || activeAdminRoute === 'A9') && (
                 <CheatDetectionConfig />
@@ -209,11 +217,13 @@ const MainRouter: React.FC = () => {
 };
 
 export default function App() {
+  const Provider = dataSource === 'api' ? ApiAppProvider : AppProvider;
   return (
-    <AppProvider>
+    <Provider>
       <div className="min-h-screen flex flex-col bg-gray-50 font-sans text-gray-900 antialiased selection:bg-blue-600 selection:text-white">
         {/* Simulation Toolbar for easy reviewer testing */}
-        <SimulationToolbar />
+        {dataSource === 'mock' && <SimulationToolbar />}
+        {dataSource === 'api' && <ApiConnectionState />}
 
         {/* Global Toast Notifications */}
         <ToastContainer />
@@ -223,6 +233,11 @@ export default function App() {
           <MainRouter />
         </div>
       </div>
-    </AppProvider>
+    </Provider>
   );
 }
+
+const ApiConnectionState: React.FC = () => {
+  const { role, apiError, apiRefresh, showToast } = useApp();
+  return <>{role && <ApiAccountActions />}{role && apiError && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 bg-amber-50 px-5 py-3 text-sm text-amber-900"><p>{apiError}</p><button onClick={() => { void apiRefresh?.().catch((failure) => showToast('โหลดข้อมูลไม่สำเร็จ', failure.message, 'error')); }} className="underline">โหลดข้อมูลใหม่</button></div>}</>;
+};

@@ -28,6 +28,8 @@ import {
 } from '../../utils/academicYear';
 import { AcademicCascade, AcademicSelection, emptyAcademicSelection } from './AcademicCascade';
 import { Modal } from '../common/Modal';
+import { dataSource } from '../../services/dataSource';
+import { api } from '../../services/apiClient';
 
 const pageSize = 10;
 const inputClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-blue-600 disabled:bg-slate-100 disabled:text-slate-400';
@@ -36,6 +38,7 @@ const buttonClass = 'inline-flex min-h-9 items-center justify-center gap-2 round
 type FilterMode = 'all' | 'admission';
 
 interface StudentFormState {
+  fullName: string;
   studentCode: string;
   firstName: string;
   lastName: string;
@@ -48,6 +51,7 @@ interface StudentFormState {
 }
 
 const emptyForm = (): StudentFormState => ({
+  fullName: '',
   studentCode: '',
   firstName: '',
   lastName: '',
@@ -76,8 +80,9 @@ export const StudentEditorForm: React.FC<StudentEditorFormProps> = ({
   const initialPath = student?.majorId ? academicPath(academicState, 'majors', student.majorId) : undefined;
   const [form, setForm] = useState<StudentFormState>(() => student ? {
     studentCode: student.studentCode,
-    firstName: student.firstName || student.firstNameEn || student.fullName.split(' ')[0] || '',
-    lastName: student.lastName || student.lastNameEn || student.fullName.split(' ').slice(1).join(' '),
+    fullName: student.fullName,
+    firstName: student.firstName || student.firstNameEn || (dataSource === 'mock' ? student.fullName.split(' ')[0] : '') || '',
+    lastName: student.lastName || student.lastNameEn || (dataSource === 'mock' ? student.fullName.split(' ').slice(1).join(' ') : ''),
     email: student.email,
     majorId: student.majorId || '',
     admissionYear: student.admissionYear ? String(student.admissionYear) : '',
@@ -98,7 +103,7 @@ export const StudentEditorForm: React.FC<StudentEditorFormProps> = ({
     group.majorId === formSelection.majorId &&
     group.admissionYear === Number(form.admissionYear)), [academicState.classGroups, formSelection.majorId, form.admissionYear, form.classGroupId]);
 
-  const saveStudent = () => {
+  const saveStudent = async () => {
     const studentCode = form.studentCode.trim();
     const firstName = form.firstName.trim();
     const lastName = form.lastName.trim();
@@ -107,17 +112,20 @@ export const StudentEditorForm: React.FC<StudentEditorFormProps> = ({
     const department = academicState.departments.find((item) => item.id === major?.departmentId);
     const faculty = academicState.faculties.find((item) => item.id === department?.facultyId);
     const year = calculateYearLevelFromAdmissionYear(admissionYear);
-    if (!studentCode || !firstName || !lastName || !form.email.trim()) return setError('กรุณากรอกข้อมูลประจำตัวให้ครบถ้วน');
+    if (!studentCode || !form.email.trim() || (dataSource === 'mock' ? !firstName || !lastName : !form.fullName.trim())) return setError('กรุณากรอกข้อมูลประจำตัวให้ครบถ้วน');
     if (students.some((item) => item.id !== student?.id && item.studentCode.toLowerCase() === studentCode.toLowerCase())) return setError('มีรหัสนักศึกษานี้อยู่แล้ว');
     if (!major || !department || !faculty || !isAcademicPathActive(academicState, 'majors', major.id)) return setError('กรุณาเลือกคณะ ภาควิชา และสาขาวิชาที่เปิดใช้งานให้ครบถ้วน');
     if (!year.isValid) return setError(year.errorMessage || 'ปีการศึกษาที่เข้าไม่ถูกต้อง');
     const values: Omit<Student, 'id'> = {
+      rowVersion: student?.rowVersion,
       studentCode,
-      fullName: `${firstName} ${lastName}`.trim(),
+      fullName: dataSource === 'api' ? form.fullName.trim() : `${firstName} ${lastName}`.trim(),
       firstName,
       lastName,
-      firstNameEn: firstName,
-      lastNameEn: lastName,
+      firstNameEn: dataSource === 'api' ? student?.firstNameEn : firstName,
+      lastNameEn: dataSource === 'api' ? student?.lastNameEn : lastName,
+      firstNameTh: student?.firstNameTh,
+      lastNameTh: student?.lastNameTh,
       email: form.email.trim(),
       majorId: major.id,
       admissionYear,
@@ -132,11 +140,12 @@ export const StudentEditorForm: React.FC<StudentEditorFormProps> = ({
       accountStatus: form.accountStatus,
       isFirstTime: false,
     };
-    const success = student ? updateStudent(student.id, values) : addStudent(values);
+    const success = student ? (await updateStudent(student.id, values)) : (await addStudent(values));
     if (success) onSuccess();
   };
 
   return <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); saveStudent(); }}>
+    {dataSource === 'api' && <label className="block text-xs font-semibold">ชื่อ-นามสกุลที่แสดง<input required value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} className={`${inputClass} mt-1`} /></label>}
     <section className="space-y-3"><h3 className="font-bold text-slate-900">ข้อมูลประจำตัว</h3><div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold">รหัสนักศึกษา<input value={form.studentCode} onChange={(event) => { const studentCode = event.target.value; const inferredYear = inferAdmissionYearFromStudentId(studentCode); setForm((current) => { const admissionYear = !admissionYearEdited && inferredYear ? String(inferredYear) : current.admissionYear; const retainedGroup = academicState.classGroups.find((group) => group.id === current.classGroupId && group.admissionYear === Number(admissionYear)); return { ...current, studentCode, admissionYear, classGroupId: retainedGroup ? current.classGroupId : '' }; }); }} className={`${inputClass} mt-1`} /><span className="mt-1 block font-normal text-slate-500">ระบบจะแนะนำปีที่เข้าศึกษาจากเลข 2 หลักแรกเมื่อรหัสนักศึกษาครบ และยังแก้ไขได้</span></label><label className="text-xs font-semibold">อีเมล<input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className={`${inputClass} mt-1`} /></label><label className="text-xs font-semibold">ชื่อ<input value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} className={`${inputClass} mt-1`} /></label><label className="text-xs font-semibold">นามสกุล<input value={form.lastName} onChange={(event) => setForm({ ...form, lastName: event.target.value })} className={`${inputClass} mt-1`} /></label></div></section>
     <section className="space-y-3 border-t pt-4">
       <h3 className="font-bold text-slate-900">ข้อมูลการศึกษา</h3>
@@ -166,7 +175,7 @@ export const StudentEditorForm: React.FC<StudentEditorFormProps> = ({
         <label className="text-xs font-semibold">กลุ่มเรียน (ไม่บังคับ)<select value={form.classGroupId} onChange={(event) => setForm({ ...form, classGroupId: event.target.value })} disabled={!formSelection.majorId || !form.admissionYear} className={`${inputClass} mt-1`}><option value="">ยังไม่กำหนด</option>{matchingFormGroups.map((group) => <option key={group.id} value={group.id}>{group.code}{group.name ? ` · ${group.name}` : ''}{group.status === 'inactive' ? ' (ปิดใช้งาน)' : ''}</option>)}</select><span className="mt-1 block font-normal text-slate-500">แสดงเฉพาะกลุ่มที่ตรงกับสาขาวิชาและปีที่เข้าศึกษา</span></label>
       </div>
     </section>
-    <section className="grid gap-3 border-t pt-4 sm:grid-cols-2"><label className="text-xs font-semibold">สถานะบัญชี<select value={form.accountStatus} onChange={(event) => setForm({ ...form, accountStatus: event.target.value as Student['accountStatus'] })} className={`${inputClass} mt-1`}><option value="active">ปกติ</option><option value="suspended">ถูกระงับ</option><option value="graduated_inactive">พ้นสภาพ</option></select></label><label className="text-xs font-semibold">URL ข้อมูลใบหน้า<input value={form.faceReferenceUrl} onChange={(event) => setForm({ ...form, faceReferenceUrl: event.target.value })} className={`${inputClass} mt-1`} /></label></section>
+    <section className="grid gap-3 border-t pt-4 sm:grid-cols-2"><label className="text-xs font-semibold">สถานะบัญชี<select disabled={dataSource === 'api' && Boolean(student)} value={form.accountStatus} onChange={(event) => setForm({ ...form, accountStatus: event.target.value as Student['accountStatus'] })} className={`${inputClass} mt-1`}><option value="active">ปกติ</option><option value="suspended">ถูกระงับ</option><option value="graduated_inactive">พ้นสภาพ</option></select></label><label className="text-xs font-semibold">URL ข้อมูลใบหน้า<input disabled={dataSource === 'api'} value={form.faceReferenceUrl} onChange={(event) => setForm({ ...form, faceReferenceUrl: event.target.value })} className={`${inputClass} mt-1`} /></label></section>
     {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-xs text-red-700">{error}</p>}
     <div className="flex justify-end gap-2 border-t pt-4"><button type="button" onClick={onCancel} className={`${buttonClass} border`}>{secondaryLabel}</button><button className={`${buttonClass} bg-blue-600 text-white`}>{student ? 'บันทึกการแก้ไข' : 'บันทึกข้อมูลนักศึกษา'}</button></div>
   </form>;
@@ -228,6 +237,12 @@ export const StudentManagement: React.FC = () => {
   };
 
   const exportCsv = () => {
+    if (dataSource === 'api') {
+      const filters = filterMode === 'all' ? { q: search.trim(), status: statusFilter } : { facultyId: selection.facultyId, departmentId: selection.departmentId, majorId: selection.majorId, admissionYear: admissionFilter, yearLevel: yearFilter, classGroupId: groupFilter };
+      const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value && value !== '__unassigned__')).toString();
+      void api.download(`/students/export?${query}${groupFilter === '__unassigned__' ? '&unassignedGroup=true' : ''}`, 'SecureLab_Students.csv').catch((failure) => showToast('ส่งออกไม่สำเร็จ', failure.message, 'error'));
+      return;
+    }
     const header = ['รหัสนักศึกษา', 'ชื่อ-นามสกุล', 'อีเมล', 'คณะ', 'ภาควิชา', 'สาขาวิชา', 'ปีที่เข้าศึกษา', 'ชั้นปี', 'กลุ่มเรียน', 'สถานะ'];
     const escape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
     const lines = filtered.map(({ student, path, year, classGroup }) => [
@@ -298,7 +313,7 @@ export const StudentManagement: React.FC = () => {
       {filterMode === 'all' ? <div className="grid items-end gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px]">
         <label className="relative min-w-0"><span className="sr-only">ค้นหานักศึกษา</span><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ค้นหารหัสนักศึกษา / ชื่อ-นามสกุล..." className={`${inputClass} pl-9`} /></label>
         <label className="space-y-1 text-xs font-semibold text-slate-700"><span>สถานะบัญชี</span><select aria-label="สถานะบัญชี" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={inputClass}><option value="">ทุกสถานะบัญชี</option><option value="active">ปกติ</option><option value="suspended">ถูกระงับ</option><option value="graduated_inactive">พ้นสภาพ</option></select></label>
-        <label className="space-y-1 text-xs font-semibold text-slate-700"><span>ข้อมูลใบหน้า</span><select aria-label="สถานะข้อมูลใบหน้า" value={faceFilter} onChange={(event) => setFaceFilter(event.target.value)} className={inputClass}><option value="">ทุกสถานะข้อมูลใบหน้า</option><option value="available">มีข้อมูลใบหน้า</option><option value="missing">ไม่มีข้อมูลใบหน้า</option></select></label>
+        {dataSource === 'mock' && <label className="space-y-1 text-xs font-semibold text-slate-700"><span>ข้อมูลใบหน้า</span><select aria-label="สถานะข้อมูลใบหน้า" value={faceFilter} onChange={(event) => setFaceFilter(event.target.value)} className={inputClass}><option value="">ทุกสถานะข้อมูลใบหน้า</option><option value="available">มีข้อมูลใบหน้า</option><option value="missing">ไม่มีข้อมูลใบหน้า</option></select></label>}
       </div> : <div className="space-y-4 rounded-xl border border-blue-100 bg-blue-50/40 p-4">
         <div><h2 className="text-sm font-bold text-slate-900">ตัวกรองข้อมูลการศึกษา</h2><p className="mt-1 text-xs text-slate-500">เลือกคณะ ภาควิชา สาขาวิชา และปีที่เข้าศึกษาเพื่อกรองนักศึกษา</p></div>
         <AcademicCascade value={selection} onChange={(next) => {
@@ -338,6 +353,6 @@ export const StudentManagement: React.FC = () => {
 
     <Modal isOpen={Boolean(detail)} onClose={() => setDetail(null)} title="รายละเอียดนักศึกษา" maxWidth="640">{detail && (() => { const path = detail.majorId ? academicPath(academicState, 'majors', detail.majorId) : undefined; const year = deriveStudentYearLevel(detail); const classGroup = academicState.classGroups.find((group) => group.id === detail.classGroupId); return <dl className="space-y-3 text-sm">{[['รหัสนักศึกษา', detail.studentCode], ['ชื่อ-นามสกุล', detail.fullName], ['อีเมล', detail.email], ['คณะ', path?.faculty?.name || '—'], ['ภาควิชา', path?.department?.name || '—'], ['สาขาวิชา', path?.major ? `[${path.major.code}] ${path.major.name}` : '—'], ['ปีที่เข้าศึกษา', detail.admissionYear ? `ปีที่เข้าศึกษา ${getAdmissionCode(detail.admissionYear)}` : '—'], ['ชั้นปี', year?.isValid ? String(year.yearLevel) : '—'], ['กลุ่มเรียน', classGroup?.code || 'ยังไม่กำหนด']].map(([label, value]) => <div key={label} className="flex justify-between gap-4 border-b pb-2"><dt className="text-slate-500">{label}</dt><dd className="text-right font-semibold">{value}</dd></div>)}</dl>; })()}</Modal>
 
-    <Modal isOpen={Boolean(confirm)} onClose={() => setConfirm(null)} title={confirm?.action === 'delete' ? 'ยืนยันการลบนักศึกษา' : 'ยืนยันการเปลี่ยนสถานะบัญชี'}>{confirm && <div className="space-y-4 text-sm"><p>ยืนยัน{confirm.action === 'delete' ? 'ลบ' : confirm.student.accountStatus === 'active' ? 'ระงับบัญชี' : 'เปิดใช้งานบัญชี'} “{confirm.student.fullName}” หรือไม่?</p><div className="flex justify-end gap-2"><button type="button" onClick={() => setConfirm(null)} className={`${buttonClass} border`}>ยกเลิก</button><button type="button" onClick={() => { const success = confirm.action === 'delete' ? deleteStudent(confirm.student.id) : (updateAccountStatus(confirm.student.id, confirm.student.accountStatus === 'active' ? 'suspended' : 'active'), true); if (success) setConfirm(null); }} className={`${buttonClass} bg-blue-600 text-white`}>ยืนยัน</button></div></div>}</Modal>
+    <Modal isOpen={Boolean(confirm)} onClose={() => setConfirm(null)} title={confirm?.action === 'delete' ? 'ยืนยันการลบนักศึกษา' : 'ยืนยันการเปลี่ยนสถานะบัญชี'}>{confirm && <div className="space-y-4 text-sm"><p>ยืนยัน{confirm.action === 'delete' ? 'ลบ' : confirm.student.accountStatus === 'active' ? 'ระงับบัญชี' : 'เปิดใช้งานบัญชี'} “{confirm.student.fullName}” หรือไม่?</p><div className="flex justify-end gap-2"><button type="button" onClick={() => setConfirm(null)} className={`${buttonClass} border`}>ยกเลิก</button><button type="button" onClick={async () => { const success = confirm.action === 'delete' ? (await deleteStudent(confirm.student.id)) : ((await updateAccountStatus(confirm.student.id, confirm.student.accountStatus === 'active' ? 'suspended' : 'active', undefined, confirm.student.rowVersion)) !== false); if (success) setConfirm(null); }} className={`${buttonClass} bg-blue-600 text-white`}>ยืนยัน</button></div></div>}</Modal>
   </div>;
 };

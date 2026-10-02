@@ -1,12 +1,14 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { getDemoTimeState, getEffectiveNow, subscribeDemoTime } from '../services/demoTime';
+import { dataSource } from '../services/dataSource';
+import { getServerNow } from '../services/serverClock';
 
 export const useExamClock = (): Date => {
   const [realNow, setRealNow] = useState(() => new Date());
   const demoTime = useSyncExternalStore(subscribeDemoTime, getDemoTimeState, getDemoTimeState);
 
   useEffect(() => {
-    if (demoTime.enabled) return;
+    if (dataSource === 'mock' && demoTime.enabled) return;
     const refresh = () => setRealNow(new Date());
     refresh();
     const timer = window.setInterval(refresh, 30_000);
@@ -22,5 +24,5 @@ export const useExamClock = (): Date => {
   const visibleRealNow = demoTime.resumedAt > realNow.getTime()
     ? new Date(demoTime.resumedAt)
     : realNow;
-  return getEffectiveNow(visibleRealNow);
+  return dataSource === 'api' ? getServerNow() : getEffectiveNow(visibleRealNow);
 };

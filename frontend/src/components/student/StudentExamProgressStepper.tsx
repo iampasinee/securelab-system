@@ -10,6 +10,7 @@ interface StudentExamProgressStepperProps {
   allCompleted?: boolean;
   errorStep?: 4;
   statusMessage?: string;
+  firstStepLabel?: string;
 }
 
 export const StudentExamProgressStepper: React.FC<StudentExamProgressStepperProps> = ({
@@ -17,11 +18,12 @@ export const StudentExamProgressStepper: React.FC<StudentExamProgressStepperProp
   allCompleted = false,
   errorStep,
   statusMessage,
+  firstStepLabel,
 }) => {
   const { language } = useApp();
   const isThai = language === 'th';
   const steps = [
-    { number: 1 as const, th: 'ยืนยันตัวตน', en: 'Identity Verification' },
+    { number: 1 as const, th: firstStepLabel || 'ยืนยันตัวตน', en: 'Identity Verification' },
     { number: 2 as const, th: 'ตรวจสอบข้อมูลและกติกา', en: 'Review Information & Rules' },
     { number: 3 as const, th: 'อัปโหลดและส่งไฟล์', en: 'Upload & Submit Files' },
     { number: 4 as const, th: 'ยืนยันการส่ง', en: 'Submission Confirmation' },

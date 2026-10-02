@@ -38,7 +38,7 @@ export const RoomComputerSetup: React.FC = () => {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [openingStatus, setOpeningStatus] = useState('');
-  const [editor, setEditor] = useState<{ kind: EditorKind; id?: string } | null>(null);
+  const [editor, setEditor] = useState<{ kind: EditorKind; id?: string; expectedVersion?: number } | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
   const [confirm, setConfirm] = useState<Extract<RoomAction, { type: 'delete' }> | null>(null);
@@ -46,6 +46,7 @@ export const RoomComputerSetup: React.FC = () => {
   const [dimensions, setDimensions] = useState({ rows: 5, columns: 8 });
   const [layoutError, setLayoutError] = useState('');
   const [isEditingLayout, setIsEditingLayout] = useState(false);
+  const [layoutVersion, setLayoutVersion] = useState<number | undefined>();
   const selectedPhysicalRoom = state.physicalRooms.find((room) => room.id === selectedPhysicalRoomId);
   const selectedRoom = state.rooms.find((room) => room.physicalRoomId === selectedPhysicalRoomId);
   const roomSeats = (id: string) => state.seats.filter((seat) => seat.roomId === id);
@@ -85,10 +86,10 @@ export const RoomComputerSetup: React.FC = () => {
     setLayoutError('');
     setIsEditingLayout(false);
   };
-  const submitLayout = (event: React.FormEvent) => {
+  const submitLayout = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedRoom) return;
-    const result = manageRooms({ type: 'layout', roomId: selectedRoom.id, ...dimensions });
+    const result = (await manageRooms({ type: 'layout', roomId: selectedRoom.id, ...dimensions, expectedVersion: layoutVersion }));
     setLayoutError(result.error || '');
     if (result.success) setIsEditingLayout(false);
   };
@@ -106,6 +107,8 @@ export const RoomComputerSetup: React.FC = () => {
     const seat = state.seats.find((item) => item.id === (seatId || device?.seatId));
     const deviceRoom = state.rooms.find((item) => item.id === seat?.roomId);
     const deviceRoomPath = deviceRoom ? resolveExamRoom(state, deviceRoom) : undefined;
+    const existing = kind === 'floor' ? floor : kind === 'physicalRoom' ? physicalRoom : kind === 'room' ? examRoom : device;
+    setEditor({ kind, id, expectedVersion: existing?.rowVersion });
     setForm({
       ...emptyForm,
       floorNumber: floor ? String(floor.floorNumber) : '',
@@ -134,7 +137,7 @@ export const RoomComputerSetup: React.FC = () => {
     });
   };
 
-  const submit = (event: React.FormEvent) => {
+  const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!editor) return;
     const common = { id: editor.id, status: form.status as DeviceReadiness };
@@ -156,7 +159,7 @@ export const RoomComputerSetup: React.FC = () => {
         : editor.kind === 'room'
           ? { ...common, type: 'room', floorId: form.floorId, physicalRoomId: form.physicalRoomId }
           : { ...common, type: 'computer', floorId: form.floorId, roomId: form.roomId, seatId: form.seatId || null, computerCode: form.computerCode, serialNumber: form.serialNumber, ipAddress: form.ipAddress, macAddress: form.macAddress };
-    const result = manageRooms(action);
+    const result = (await manageRooms({ ...action, expectedVersion: editor.expectedVersion }));
     if (result.success) {
       setEditor(null);
       if (editor.kind === 'room' && form.physicalRoomId) {
@@ -303,7 +306,7 @@ export const RoomComputerSetup: React.FC = () => {
             <h2 className="mt-1 text-lg font-bold text-slate-900">{selectedPhysicalRoom.roomCode}</h2>
             <p className="mt-1 text-xs text-slate-500">{floorText(selectedPhysicalRoom.floorId)} · {roomSeats(selectedRoom.id).length} ที่นั่ง · {roomComputers(selectedRoom.id).length} เครื่อง</p>
           </div>
-          {!isEditingLayout && <button type="button" onClick={() => { setDimensions({ rows: selectedRoom.rows, columns: selectedRoom.columns }); setLayoutError(''); setIsEditingLayout(true); }} className={buttonClass}><Pencil className="h-4 w-4" />แก้ไขผัง</button>}
+          {!isEditingLayout && <button type="button" onClick={() => { setDimensions({ rows: selectedRoom.rows, columns: selectedRoom.columns }); setLayoutVersion(selectedRoom.rowVersion); setLayoutError(''); setIsEditingLayout(true); }} className={buttonClass}><Pencil className="h-4 w-4" />แก้ไขผัง</button>}
         </div>
 
         {isEditingLayout ? (
@@ -359,7 +362,7 @@ export const RoomComputerSetup: React.FC = () => {
       {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}<div className="flex justify-end gap-2 border-t pt-4"><button type="button" onClick={() => setEditor(null)} className={buttonClass}>ยกเลิก</button><button type="submit" className={primaryClass}>บันทึก</button></div>
     </form></Modal>
 
-    <Modal isOpen={Boolean(confirm)} onClose={() => setConfirm(null)} title="ยืนยันการลบ"><p className="text-sm">ยืนยันลบข้อมูลนี้หรือไม่? ระบบจะตรวจสอบการอ้างอิงก่อนลบ</p>{error && <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}<div className="mt-4 flex justify-end gap-2"><button onClick={() => setConfirm(null)} className={buttonClass}>ยกเลิก</button><button className={primaryClass} onClick={() => { if (confirm) { const result = manageRooms(confirm); if (result.success) setConfirm(null); else setError(result.error || 'ลบไม่สำเร็จ'); } }}>ยืนยันลบ</button></div></Modal>
+    <Modal isOpen={Boolean(confirm)} onClose={() => setConfirm(null)} title="ยืนยันการลบ"><p className="text-sm">ยืนยันลบข้อมูลนี้หรือไม่? ระบบจะตรวจสอบการอ้างอิงก่อนลบ</p>{error && <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}<div className="mt-4 flex justify-end gap-2"><button onClick={() => setConfirm(null)} className={buttonClass}>ยกเลิก</button><button className={primaryClass} onClick={async () => { if (confirm) { const result = (await manageRooms(confirm)); if (result.success) setConfirm(null); else setError(result.error || 'ลบไม่สำเร็จ'); } }}>ยืนยันลบ</button></div></Modal>
 
     <Modal isOpen={Boolean(detail)} onClose={() => setDetail(null)} title="รายละเอียด">{detail && (() => {
       const physicalRoom = detail.kind === 'physicalRoom' ? state.physicalRooms.find((item) => item.id === detail.id) : undefined;

@@ -6,3 +6,25 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Frontend dependencies, build output, and local configuration
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.env
+/frontend/.env.local
+
+# Python environments, packaging output, and caches
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+/backend/.env
+
+# Runtime submission files must never enter Git
+/storage/data/*
+/storage/uploads/*
+/storage/exams/*

@@ -12,6 +12,7 @@ interface FinalSubmissionConfirmationProps {
   statusLabel: (status: StagedUploadStatus) => string;
   onCancel: () => void;
   onConfirm: () => void;
+  explanation?: string;
 }
 
 /** Confirmation only: file actions remain in the prepared-file list. */
@@ -23,6 +24,7 @@ export const FinalSubmissionConfirmation: React.FC<FinalSubmissionConfirmationPr
   statusLabel,
   onCancel,
   onConfirm,
+  explanation,
 }) => <Modal
   isOpen={isOpen}
   onClose={onCancel}
@@ -38,9 +40,9 @@ export const FinalSubmissionConfirmation: React.FC<FinalSubmissionConfirmationPr
 >
   <div className="space-y-3 text-left text-xs text-gray-700">
     <p>
-      {isThai
+      {explanation || (isThai
         ? 'คุณแน่ใจหรือไม่ว่าต้องการส่งไฟล์ข้อสอบเหล่านี้? ระบบจะตรวจสอบขนาดไฟล์ ความสามารถในการเปิดอ่าน และสร้างบันทึกดิจิทัลที่ป้องกันการแก้ไขสำหรับอาจารย์ผู้คุมสอบ'
-        : 'Are you sure you want to submit these exam files? The system will verify non-zero byte size, structural readability, and compile a tamper-evident audit record for proctor review.'}
+        : 'Are you sure you want to submit these exam files? The system will verify non-zero byte size, structural readability, and compile a tamper-evident audit record for proctor review.')}
     </p>
     <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
       <span className="mb-2 block font-semibold text-gray-900">

@@ -72,7 +72,15 @@ export interface ToastMessage {
   type: 'success' | 'error' | 'warning' | 'info';
 }
 
-interface AppContextType {
+export type MaybeAsync<T> = T | Promise<T>;
+
+export interface AppContextType {
+  apiLoading?: boolean;
+  apiError?: string;
+  apiUser?: import('../types/api').ApiUser | null;
+  apiRefresh?: () => Promise<void>;
+  apiLogin?: (email: string, password: string) => Promise<void>;
+  apiOverview?: Record<string, unknown>;
   // Localization & Language
   language: AppLanguage;
   setLanguage: (lang: AppLanguage) => void;
@@ -108,19 +116,19 @@ interface AppContextType {
   // Active Violation for Student ST8 Overlay
   activeViolationAlert: Violation | null;
   setActiveViolationAlert: (violation: Violation | null) => void;
-  acknowledgeViolation: (id: string) => void;
+  acknowledgeViolation: (id: string) => MaybeAsync<void>;
 
   // Security & Proctoring
   securityRules: CheatDetectionRules;
-  updateSecurityRules: (rules: Partial<CheatDetectionRules>) => void;
+  updateSecurityRules: (rules: Partial<CheatDetectionRules>) => MaybeAsync<void>;
 
   // Collections
   academicState: AcademicState;
-  saveAcademicRecord: (tier: AcademicTier, input: AcademicInput, id?: string) => AcademicResult;
-  saveAcademicStructure: (draft: AcademicStructureWizardDraft) => AcademicStructureTransactionResult & AcademicResult;
-  deleteAcademicRecord: (tier: AcademicTier, id: string) => AcademicResult;
-  setAcademicStatus: (tier: AcademicTier, id: string, status: 'active' | 'inactive') => AcademicResult;
-  assignStudentsToClassGroup: (groupId: string, studentIds: string[], allowReassign?: boolean) => AcademicResult;
+  saveAcademicRecord: (tier: AcademicTier, input: AcademicInput, id?: string) => MaybeAsync<AcademicResult>;
+  saveAcademicStructure: (draft: AcademicStructureWizardDraft) => MaybeAsync<AcademicStructureTransactionResult & AcademicResult>;
+  deleteAcademicRecord: (tier: AcademicTier, id: string) => MaybeAsync<AcademicResult>;
+  setAcademicStatus: (tier: AcademicTier, id: string, status: 'active' | 'inactive') => MaybeAsync<AcademicResult>;
+  assignStudentsToClassGroup: (groupId: string, studentIds: string[], allowReassign?: boolean) => MaybeAsync<AcademicResult>;
   students: Student[];
   /** Existing Student master records available for teacher Section enrollment search. */
   studentDirectory: Student[];
@@ -128,7 +136,7 @@ interface AppContextType {
   admins: Admin[];
   rooms: Room[];
   roomState: RoomState;
-  manageRooms: (action: RoomAction) => RoomActionResult;
+  manageRooms: (action: RoomAction) => MaybeAsync<RoomActionResult>;
   courses: Course[];
   examSessions: ExamSession[];
   seatAssignments: SeatAssignment[];
@@ -142,49 +150,49 @@ interface AppContextType {
   dismissToast: (id: string) => void;
 
   // Student Actions
-  addStudent: (student: Omit<Student, 'id'>) => boolean;
-  updateStudent: (id: string, updates: Partial<Student>) => boolean;
-  deleteStudent: (id: string) => boolean;
-  updateAccountStatus: (id: string, status: AccountStatus, reason?: string) => void;
-  updateFaceReference: (id: string, url: string) => void;
+  addStudent: (student: Omit<Student, 'id'>) => MaybeAsync<boolean>;
+  updateStudent: (id: string, updates: Partial<Student>) => MaybeAsync<boolean>;
+  deleteStudent: (id: string) => MaybeAsync<boolean>;
+  updateAccountStatus: (id: string, status: AccountStatus, reason?: string, expectedVersion?: number) => MaybeAsync<void | boolean>;
+  updateFaceReference: (id: string, url: string) => MaybeAsync<void>;
 
   // Teacher Actions
-  addTeacher: (teacher: Omit<Teacher, 'id'>) => boolean;
-  updateTeacher: (id: string, updates: Partial<Teacher>) => boolean;
-  deleteTeacher: (id: string) => boolean;
+  addTeacher: (teacher: Omit<Teacher, 'id'>) => MaybeAsync<boolean>;
+  updateTeacher: (id: string, updates: Partial<Teacher>) => MaybeAsync<boolean>;
+  deleteTeacher: (id: string) => MaybeAsync<boolean>;
 
   // Admin Actions
-  addAdmin: (admin: Omit<Admin, 'id'>) => void;
-  updateAdmin: (id: string, updates: Partial<Admin>) => void;
-  deleteAdmin: (id: string) => boolean;
+  addAdmin: (admin: Omit<Admin, 'id'>) => MaybeAsync<void | boolean>;
+  updateAdmin: (id: string, updates: Partial<Admin>) => MaybeAsync<void | boolean>;
+  deleteAdmin: (id: string) => MaybeAsync<boolean>;
 
   // Room Actions
 
   // Course Actions
-  addCourse: (course: Omit<Course, 'id'>) => void;
-  updateCourse: (id: string, updates: Partial<Course>) => void;
-  deleteCourse: (id: string) => boolean;
-  saveCourseRecord: (input: CourseInput, id?: string) => CourseActionResult;
-  saveSectionRecord: (input: SectionInput, id?: string) => CourseActionResult;
-  deleteSectionRecord: (sectionId: string) => CourseActionResult;
-  setSectionStatus: (sectionId: string, status: 'active' | 'inactive') => CourseActionResult;
-  addStudentToSection: (studentId: string, sectionId: string) => CourseActionResult;
-  moveStudentBetweenSections: (studentId: string, fromSectionId: string, toSectionId: string) => CourseActionResult;
+  addCourse: (course: Omit<Course, 'id'>) => MaybeAsync<void>;
+  updateCourse: (id: string, updates: Partial<Course>) => MaybeAsync<void>;
+  deleteCourse: (id: string) => MaybeAsync<boolean>;
+  saveCourseRecord: (input: CourseInput, id?: string) => MaybeAsync<CourseActionResult>;
+  saveSectionRecord: (input: SectionInput, id?: string) => MaybeAsync<CourseActionResult>;
+  deleteSectionRecord: (sectionId: string) => MaybeAsync<CourseActionResult>;
+  setSectionStatus: (sectionId: string, status: 'active' | 'inactive') => MaybeAsync<CourseActionResult>;
+  addStudentToSection: (studentId: string, sectionId: string) => MaybeAsync<CourseActionResult>;
+  moveStudentBetweenSections: (studentId: string, fromSectionId: string, toSectionId: string) => MaybeAsync<CourseActionResult>;
   findStudentSectionInCourse: (studentId: string, courseId: string, targetSectionId: string) => { sectionId: string; sectionNo: string; manageable: boolean } | null;
 
   // Exam Actions
-  createExamSession: (exam: Omit<ExamSession, 'id'>) => void;
-  updateExamSession: (id: string, updates: Partial<ExamSession>) => void;
-  adjustExamTime: (examId: string, deltaMinutes: number, scope: 'room' | 'student', targetStudentId?: string, reason?: string) => void;
-  reopenSubmission: (examId: string, extraMinutes: number, scope: 'room' | 'student', targetStudentId?: string, reason?: string) => void;
+  createExamSession: (exam: Omit<ExamSession, 'id'>) => MaybeAsync<void | boolean>;
+  updateExamSession: (id: string, updates: Partial<ExamSession>) => MaybeAsync<void | boolean>;
+  adjustExamTime: (examId: string, deltaMinutes: number, scope: 'room' | 'student', targetStudentId?: string, reason?: string) => MaybeAsync<void>;
+  reopenSubmission: (examId: string, extraMinutes: number, scope: 'room' | 'student', targetStudentId?: string, reason?: string) => MaybeAsync<void>;
 
   // Seat Assignment Actions
-  assignSeat: (examId: string, seatNo: string, studentId: string) => void;
-  unassignSeat: (examId: string, seatNo: string) => void;
-  autoAssignSeats: (examId: string, roomId: string) => void;
+  assignSeat: (examId: string, seatNo: string, studentId: string) => MaybeAsync<void | boolean>;
+  unassignSeat: (examId: string, seatNo: string) => MaybeAsync<void | boolean>;
+  autoAssignSeats: (examId: string, roomId: string) => MaybeAsync<void | boolean>;
 
   // Submission Actions
-  submitStudentFiles: (examId: string, studentId: string, files: { uploadId: string; submissionName: string; sizeBytes: number; snippet?: string }[]) => boolean;
+  submitStudentFiles: (examId: string, studentId: string, files: { uploadId: string; submissionName: string; sizeBytes: number; snippet?: string }[]) => MaybeAsync<boolean>;
 
   // Simulation helpers
   triggerViolation: (examId: string, studentId: string, seatNo: string, type: ViolationType, detail: string) => void;
@@ -192,7 +200,7 @@ interface AppContextType {
   resetToMockDefaults: () => void;
 }
 
-const AppContext = createContext<AppContextType | undefined>(undefined);
+export const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const defaultSecurityRules: CheatDetectionRules = {
   multipleFaceDetection: true,
@@ -1107,6 +1115,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       offline: 'ออฟไลน์',
       damaged: 'ชำรุด',
       unavailable: 'ไม่พร้อมใช้งาน',
+      unknown: 'ยังไม่มีข้อมูลการเชื่อมต่อ',
     };
     showToast('อัปเดตสถานะอุปกรณ์แล้ว', `ตั้งค่าที่นั่ง ${seatNo} เป็น ${statusText[status]}`, 'info');
   };

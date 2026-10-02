@@ -249,7 +249,7 @@ export const AdminDashboard: React.FC = () => {
 
                   {!vio.acknowledged && (
                     <button
-                      onClick={() => acknowledgeViolation(vio.id)}
+                      onClick={async () => (await acknowledgeViolation(vio.id))}
                       className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg text-[10px] shrink-0 cursor-pointer"
                     >
                       {isThai ? 'รับทราบ' : 'Acknowledge'}

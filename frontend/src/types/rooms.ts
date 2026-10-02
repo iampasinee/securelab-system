@@ -2,17 +2,20 @@ import type { MachineStatus } from '../types';
 
 export type DeviceReadiness = 'ready' | 'maintenance' | 'inactive';
 export interface FloorRecord {
+  rowVersion?: number;
   id: string;
   floorNumber: number;
   status: 'active' | 'inactive';
 }
 export interface PhysicalRoomRecord {
+  rowVersion?: number;
   id: string;
   floorId: string;
   roomCode: string;
   status: 'active' | 'inactive';
 }
 export interface ExamRoomRecord {
+  rowVersion?: number;
   id: string;
   physicalRoomId: string;
   status: DeviceReadiness;
@@ -29,6 +32,7 @@ export interface RoomSeatRecord {
   examSeatNo: string;
 }
 export interface ComputerDeviceRecord {
+  rowVersion?: number;
   id: string;
   computerCode: string;
   serialNumber: string;
@@ -47,11 +51,12 @@ export interface RoomState {
   seats: RoomSeatRecord[];
   computers: ComputerDeviceRecord[];
 }
-export type RoomAction =
+export type RoomAction = (
   | { type: 'floor'; id?: string; floorNumber: number; status: FloorRecord['status'] }
   | { type: 'physicalRoom'; id?: string; floorId: string; roomCode: string; status: PhysicalRoomRecord['status'] }
   | { type: 'room'; id?: string; floorId: string; physicalRoomId: string; status: DeviceReadiness }
   | { type: 'layout'; roomId: string; rows: number; columns: number }
   | { type: 'computer'; id?: string; computerCode: string; serialNumber: string; ipAddress: string; macAddress: string; seatId: string | null; floorId: string; roomId: string; status: DeviceReadiness }
-  | { type: 'delete'; entity: 'floors' | 'physicalRooms' | 'rooms' | 'computers'; id: string };
+  | { type: 'delete'; entity: 'floors' | 'physicalRooms' | 'rooms' | 'computers'; id: string }
+) & { expectedVersion?: number };
 export interface RoomActionResult { success: boolean; error?: string; state?: RoomState }

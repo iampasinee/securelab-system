@@ -9,8 +9,11 @@ import type {
   Student,
 } from '../types';
 import { studentMatchesSection } from './courseState';
+import { getExamDraftStorageKey } from './examDraftNamespace';
+import { dataSource } from './dataSource';
 
 export interface ExamWizardState {
+  sectionId?: string;
   courseId: string;
   sectionNo: string;
   examName: string;
@@ -146,6 +149,7 @@ export const createEmptyExamWizardState = (): ExamWizardState => ({
 export const examWizardStateFromSession = (exam: ExamSession): ExamWizardState => ({
   ...createEmptyExamWizardState(),
   courseId: exam.courseId,
+  sectionId: exam.sectionId,
   sectionNo: exam.sectionNo,
   examName: exam.examName || 'การสอบ',
   examType: exam.examType || 'other',
@@ -169,21 +173,22 @@ export const sectionsForWizardCourse = (courses: Course[], courseId: string) =>
 export const selectWizardCourse = (state: ExamWizardState, courseId: string, courses: Course[]): ExamWizardState => ({
   ...state,
   courseId,
+  sectionId: courseId === state.courseId ? state.sectionId : undefined,
   sectionNo: sectionsForWizardCourse(courses, courseId).some((section) => section.sectionNo === state.sectionNo)
     ? state.sectionNo
     : '',
 });
 
 export const resolveWizardSection = (state: ExamWizardState, courses: Course[]) =>
-  sectionsForWizardCourse(courses, state.courseId).find((section) => section.sectionNo === state.sectionNo);
+  sectionsForWizardCourse(courses, state.courseId).find((section) => state.sectionId ? section.id === state.sectionId : dataSource === 'mock' && section.sectionNo === state.sectionNo);
 
 export const resolveEligibleExamStudents = (
-  state: Pick<ExamWizardState, 'courseId' | 'sectionNo'>,
+  state: Pick<ExamWizardState, 'courseId' | 'sectionNo' | 'sectionId'>,
   courses: Course[],
   students: Student[],
 ) => {
   const section = courses.find((course) => course.id === state.courseId)?.sections
-    .find((candidate) => candidate.sectionNo === state.sectionNo && candidate.status !== 'inactive');
+    .find((candidate) => (state.sectionId ? candidate.id === state.sectionId : dataSource === 'mock' && candidate.sectionNo === state.sectionNo) && candidate.status !== 'inactive');
   return section ? students.filter((student) => studentMatchesSection(student, section)) : [];
 };
 
@@ -218,8 +223,8 @@ export const findExamRoomConflict = (
   });
 };
 
-export const getExamRoomCapacity = (room?: Room) => room?.seats.length || 0;
-export const getExamRoomComputerCount = (room?: Room) => room?.seats.filter((seat) => !seat.disabled && seat.machineNo).length || 0;
+export const getExamRoomCapacity = (room?: Room) => room?.capacity ?? room?.seats.length ?? 0;
+export const getExamRoomComputerCount = (room?: Room) => room?.computerCount ?? room?.seats.filter((seat) => !seat.disabled && seat.machineNo).length ?? 0;
 
 export const normalizeFileExtension = (value: string) => {
   const normalized = value.trim().toLowerCase().replace(/[^a-z0-9.]/g, '');
@@ -331,7 +336,7 @@ export const applyRecommendedExamResources = (policy: ExamPolicy, format: ExamSe
 export const validateExamWizard = (state: ExamWizardState, environment: ExamWizardEnvironment) => {
   const errors: Record<string, string> = {};
   const course = environment.courses.find((candidate) => candidate.id === state.courseId && candidate.status === 'active');
-  const section = course?.sections.find((candidate) => candidate.sectionNo === state.sectionNo && candidate.status !== 'inactive');
+  const section = resolveWizardSection(state, environment.courses);
   const room = environment.rooms.find((candidate) => candidate.id === state.roomId);
   const eligibleCount = resolveEligibleExamStudents(state, environment.courses, environment.students).length;
   const durationMinutes = calculateExamDurationMinutes(state.startTime, state.endTime);
@@ -368,6 +373,7 @@ export const examWizardToSession = (
   examName: state.examName.trim(),
   examType: state.examType,
   courseId: state.courseId,
+  sectionId: state.sectionId,
   sectionNo: state.sectionNo,
   examDate: state.examDate,
   startTime: state.startTime,
@@ -394,7 +400,7 @@ export const loadExamDrafts = (
   storage?: Pick<Storage, 'getItem' | 'setItem'>,
 ): ExamDraftRecord[] => {
   try {
-    const value = storageOrUndefined(storage)?.getItem(examDraftStorageKey);
+    const value = storageOrUndefined(storage)?.getItem(getExamDraftStorageKey(examDraftStorageKey));
     const records = value ? JSON.parse(value) : [];
     return Array.isArray(records) ? records.filter((record) => record.teacherId === teacherId) : [];
   } catch {
@@ -410,13 +416,13 @@ export const persistExamDraft = (
   if (!target) return;
   let records: ExamDraftRecord[] = [];
   try {
-    const value = target.getItem(examDraftStorageKey);
+    const value = target.getItem(getExamDraftStorageKey(examDraftStorageKey));
     records = value ? JSON.parse(value) : [];
     if (!Array.isArray(records)) records = [];
   } catch {
     records = [];
   }
-  target.setItem(examDraftStorageKey, JSON.stringify([...records.filter((record) => record.id !== draft.id), draft]));
+  target.setItem(getExamDraftStorageKey(examDraftStorageKey), JSON.stringify([...records.filter((record) => record.id !== draft.id), draft]));
 };
 
 export const removeExamDraft = (
@@ -427,10 +433,10 @@ export const removeExamDraft = (
   if (!target) return;
   let records: ExamDraftRecord[] = [];
   try {
-    const value = target.getItem(examDraftStorageKey);
+    const value = target.getItem(getExamDraftStorageKey(examDraftStorageKey));
     records = value ? JSON.parse(value) : [];
   } catch {
     records = [];
   }
-  target.setItem(examDraftStorageKey, JSON.stringify(records.filter((record) => record.id !== draftId)));
+  target.setItem(getExamDraftStorageKey(examDraftStorageKey), JSON.stringify(records.filter((record) => record.id !== draftId)));
 };

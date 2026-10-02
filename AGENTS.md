@@ -1,50 +1,101 @@
 # Repository Guidelines
 
+## Repository Scope and Ownership
+
+This is the main `securelab-system` repository. Work only in the opened workspace and verify the Git root/remotes before structural changes. Do not modify the old `workflow-architect` repository, change remotes, reinitialize Git, or commit/push automatically.
+
+The repository is organized without Nx, Turborepo, pnpm workspaces, or Lerna:
+
+* `frontend/` owns UI and client behavior, with its own npm package and existing React/Vite tests.
+* `backend/` owns future authentication, authorization, domain logic, and persistence, using FastAPI, Pydantic, SQLAlchemy, Alembic, and PostgreSQL.
+* `agent/` owns future device/endpoint enforcement; currently documentation/placeholder only.
+* `storage/` contains runtime submission files, never committed to Git.
+* `infra/` owns deployment/configuration; development Compose remains at the root.
+* `docs/` owns architecture and API documentation.
+* PostgreSQL stores structured data, submission metadata, status, hashes, and audit records.
+* Local Storage stores the actual uploaded Student files.
+
+Root `AGENTS.md` is the canonical rules document for every area. The existing detailed frontend/domain rules below remain binding. Frontend paths are repository-relative; run npm commands from `frontend/`. Python uses four-space indentation and single quotes where practical; the existing two-space/TypeScript conventions apply to the frontend.
+
+## Current Foundation and Migration Direction
+
+The frontend remains a working mock prototype. Preserve AppContext, localStorage, IndexedDB, mock authentication, demo tools, File Preview, routes, and all Student/Teacher/Admin flows. Do not rewrite or replace them merely because a backend directory now exists. Integration proceeds incrementally from frontend mock services to Backend API services.
+
+The backend currently implements only `GET /health`, with empty SQLAlchemy domain metadata and an Alembic foundation. Health must remain database-independent and is a liveness check, not database/storage readiness. Database connections are lazy; do not create schema with `create_all()` at startup. Register future models through `backend/app/models/__init__.py` for Alembic discovery.
+
+Keep route handling in `backend/app/api/`, infrastructure/settings in `core/`, SQLAlchemy models in `models/`, Pydantic contracts in `schemas/`, domain decisions in `services/`, and persistence access in `repositories/`. Do not add fake business implementations as placeholders.
+
+Full authentication/OAuth/JWT, domain schema/APIs, upload/hash/final-lock processing, Agent/device certificates, face verification, offline isolation, WORM/Object Lock, blockchain, and code judging are deferred. Do not implement them as part of repository foundation work.
+
+## Repository Security and Persistence Boundaries
+
+All uploaded files are untrusted data. **NEVER EXECUTE uploaded files.** Frontend preview, backend, database, and local storage must never import, evaluate, compile, launch, or serve uploaded code as active content. Preserve the detailed upload safety rules below.
+
+The frontend is not authoritative for security-critical decisions. The backend will become authoritative for permissions, exam time, exam status, and submission state. Agent enforcement belongs to the future endpoint application; configuration in a frontend mock does not constitute enforcement.
+
+Future PostgreSQL schema changes must use reviewed Alembic migrations. Browser persistence changes still require their existing forward migrations. Do not silently mutate stored schema/data, wipe browser storage, or delete database volumes to avoid a migration.
+
+Runtime files belong under `storage/data/exams/{examId}/{studentId}/{submissionId}/`. The development bind mount is `./storage/data:/data/securelab`; container `STORAGE_ROOT` must match the mount. PostgreSQL stores metadata; files stay in Local Storage. Never commit data under `storage/data/`, `storage/uploads/`, or `storage/exams/`.
+
+Keep root Docker/backend settings in root `.env.example`, direct Python settings in `backend/.env.example`, and browser variables in `frontend/.env.example`. Real `.env` files and credentials must remain ignored. Never bake them into images or expose server secrets in browser variables.
+
+## Repository Validation
+
+For frontend relocation or cross-flow changes, run `npm install`, lint, **every existing `test:*` script** in `frontend/package.json`, and build from `frontend/`. Verify the Vite dev server still starts on port 3000. Do not invent test script names or move generated root `node_modules/`/`dist/`; regenerate them in `frontend/`.
+
+For backend changes, from `backend/`, install the package/test extras in a virtual environment, run `python -m pytest`, verify `app.main:app` imports/starts, and check `/health`. No PostgreSQL setup should be required for that endpoint.
+
+For Compose changes, validate from root with `docker compose config --quiet` after configuring `.env`, or `docker compose --env-file .env.example config --quiet` for the template. If the engine is available, start the project's services and verify health. Do not modify unrelated Docker resources. Report unavailable validation explicitly.
+
+Run `git diff --check` before completion and report moves, new foundations, checks, limitations, and deferred work. Preserve the existing frontend/domain checks below.
+
+---
+
 ## Project Structure & Module Organization
 
-This project is a React 19, TypeScript, Vite 6, and Tailwind CSS 4 frontend prototype for a university exam submission and exam management system.
+The `frontend/` application is the existing React 19, TypeScript, Vite 6, and Tailwind CSS 4 prototype for a university exam submission and exam management system.
 
-The application starts in `src/main.tsx`.
+The application starts in `frontend/src/main.tsx`.
 
-`src/App.tsx` selects and renders role-based flows.
+`frontend/src/App.tsx` selects and renders role-based flows.
 
 Put role-specific UI in:
 
-* `src/components/student/`
-* `src/components/teacher/`
-* `src/components/admin/`
+* `frontend/src/components/student/`
+* `frontend/src/components/teacher/`
+* `frontend/src/components/admin/`
 
 Put shared UI primitives in:
 
-* `src/components/common/`
+* `frontend/src/components/common/`
 
 Put demo, mock, and simulation controls in:
 
-* `src/components/simulation/`
+* `frontend/src/components/simulation/`
 
 Application state, persisted browser state, and migrations live primarily in:
 
-* `src/context/AppContext.tsx`
+* `frontend/src/context/AppContext.tsx`
 
 Models, domain types, and seed/mock data live in:
 
-* `src/types.ts`
-* `src/types/`
-* `src/data/`
+* `frontend/src/types.ts`
+* `frontend/src/types/`
+* `frontend/src/data/`
 
 Domain services and migrations live in:
 
-* `src/services/academicState.ts`
-* `src/services/courseState.ts`
-* `src/services/roomState.ts`
+* `frontend/src/services/academicState.ts`
+* `frontend/src/services/courseState.ts`
+* `frontend/src/services/roomState.ts`
 
 Global styles belong in:
 
-* `src/index.css`
+* `frontend/src/index.css`
 
 Static assets belong in:
 
-* `public/`
+* `frontend/public/`
 
 Do not rebuild the project from scratch unless explicitly requested.
 
@@ -82,7 +133,7 @@ Prefer simple and maintainable domain structures over unnecessary hierarchy.
 
 ## Build, Test, and Development Commands
 
-Use:
+Run these frontend commands from `frontend/` (use `cd frontend` from the repository root):
 
 * `npm install` — install locked dependencies
 * `npm run dev` — start Vite on port 3000 and expose it on the LAN
@@ -94,7 +145,7 @@ Use:
 * `npm run test:exam-wizard` — test teacher exam setup, authorization, draft persistence, and schedule validation
 * `npm run test:exam-management` — test teacher exam search and filters
 * `npm run test:monitoring` — test authorized monitoring summaries, calendar counts, and daily filters
-* `npm run build` — create the production bundle in `dist/`
+* `npm run build` — create the production bundle in `frontend/dist/`
 * `npm run preview` — serve the production bundle locally
 * `git diff --check` — check whitespace errors before finishing
 
@@ -115,7 +166,7 @@ npm run build
 git diff --check
 ```
 
-Also inspect `package.json` and run any other relevant tests already defined by the project.
+Also inspect `frontend/package.json` and run any other relevant tests already defined by the project.
 
 Do not consider a task complete if tests or build errors introduced by the change remain unresolved.
 
@@ -293,7 +344,7 @@ For example, if Major already references Department and Department references Fa
 
 Use:
 
-`src/services/academicState.ts`
+`frontend/src/services/academicState.ts`
 
 for academic relationships, validation, migration, selectors, and academic domain rules where appropriate.
 
@@ -481,7 +532,7 @@ Do not permanently store year level as the canonical source of truth.
 
 Use:
 
-`src/utils/academicYear.ts`
+`frontend/src/utils/academicYear.ts`
 
 for derived academic-year and student-year calculations.
 
@@ -710,11 +761,11 @@ Search for legacy usages such as `groupId`, `groupIds`, legacy group codes, and 
 
 Course and section rules live primarily in:
 
-`src/services/courseState.ts`
+`frontend/src/services/courseState.ts`
 
 The Admin UI is primarily in:
 
-`src/components/admin/CoursesAndSectionsPage.tsx`
+`frontend/src/components/admin/CoursesAndSectionsPage.tsx`
 
 Preserve the existing:
 
@@ -963,7 +1014,7 @@ When modifying persisted schemas, inspect all migration versions and existing st
 
 State and migration logic live primarily in:
 
-`src/context/AppContext.tsx`
+`frontend/src/context/AppContext.tsx`
 
 Before changing persisted shapes:
 
@@ -984,10 +1035,10 @@ Preserve valid existing demo data where practical.
 
 Authentication is frontend-only and lives primarily in:
 
-* `src/components/auth/`
-* `src/services/authState.ts`
-* `src/types/auth.ts`
-* the mock-auth slice in `src/context/AppContext.tsx`
+* `frontend/src/components/auth/`
+* `frontend/src/services/authState.ts`
+* `frontend/src/types/auth.ts`
+* the mock-auth slice in `frontend/src/context/AppContext.tsx`
 
 Supported university domains are:
 
@@ -1059,7 +1110,7 @@ Do not silently assign students from the wrong Major or admission year.
 The Teacher `จัดการรายวิชา & กลุ่มเรียน` page is course-first, then Section-first. Only assigned Sections may be shown. Student master records remain Admin-managed. Individual exceptions to cohort membership use `includedStudentIds` and `excludedStudentIds` on existing Sections in `securelab_courses`; effective membership is base cohort plus inclusions minus exclusions. Teacher add/move operations must validate both Section assignments, prevent duplicates and cross-course moves, and never modify Student master data. Before an override changes an in-progress or completed exam's Section, freeze that exam's eligible student IDs; upcoming exams continue using the effective live roster.
 
 
-Teacher exam setup lives in `src/components/teacher/ExamCreationWizard.tsx` and `src/services/examWizard.ts`. The `จัดการสอบ` page lives in `src/components/teacher/CourseExamSessionManager.tsx`; its canonical exam filters live in `src/services/teacherExamManagement.ts`.
+Teacher exam setup lives in `frontend/src/components/teacher/ExamCreationWizard.tsx` and `frontend/src/services/examWizard.ts`. The `จัดการสอบ` page lives in `frontend/src/components/teacher/CourseExamSessionManager.tsx`; its canonical exam filters live in `frontend/src/services/teacherExamManagement.ts`.
 
 The exam Wizard has six steps: exam information, eligible students, schedule and Exam Room, online/offline mode, policies, and review/save. Course and Section choices must be authorized through Primary Teacher or Co-Teacher assignments. Resolve eligible students through existing Section cohorts. Validate the time range, room conflict, and capacity before final creation. Policies are frontend configuration only; do not imply that an Agent, network control, or biometric verification is enforced.
 
@@ -1067,7 +1118,7 @@ Keep incomplete drafts separate from canonical `ExamSession` records under `secu
 
 The `การสอบทั้งหมด` tab filters already-authorized exams by search text, canonical status (`upcoming`, `in_progress`, `completed`), and exam mode (`online`, `offline`). Its tab count represents all authorized canonical exams, while a separate result count may reflect filters. The `ร่างการสอบ` tab has independent draft search; canonical exam filters must not affect it.
 
-Teacher monitoring lives in `src/components/teacher/LiveExamMonitoring.tsx`, `MonitoringCalendar.tsx`, `MonitoringDatePickerPopover.tsx`, and `src/services/teacherMonitoring.ts`. The daily overview retains status counters and search/status/course/room filters. The full calendar and compact date picker display schedule dates and exam counts (`N รอบ`) only, without status dots, status categories, or a status legend in their date cells. Both date controls use the same selected date; choosing a date returns to the daily overview without opening an exam detail automatically. Keep monitoring restricted to the Teacher's authorized Course/Sections.
+Teacher monitoring lives in `frontend/src/components/teacher/LiveExamMonitoring.tsx`, `MonitoringCalendar.tsx`, `MonitoringDatePickerPopover.tsx`, and `frontend/src/services/teacherMonitoring.ts`. The daily overview retains status counters and search/status/course/room filters. The full calendar and compact date picker display schedule dates and exam counts (`N รอบ`) only, without status dots, status categories, or a status legend in their date cells. Both date controls use the same selected date; choosing a date returns to the daily overview without opening an exam detail automatically. Keep monitoring restricted to the Teacher's authorized Course/Sections.
 
 ---
 
@@ -1115,15 +1166,15 @@ Do not consider an academic refactor complete if only the Admin page works.
 
 Room and device rules live primarily in:
 
-`src/services/roomState.ts`
+`frontend/src/services/roomState.ts`
 
 Types live in:
 
-`src/types/rooms.ts`
+`frontend/src/types/rooms.ts`
 
 The Admin UI is primarily in:
 
-`src/components/admin/RoomComputerSetup.tsx`
+`frontend/src/components/admin/RoomComputerSetup.tsx`
 
 The canonical hierarchy is:
 
@@ -1197,7 +1248,7 @@ For newly created Physical Rooms, Admin enters only a suffix and the system gene
 ชั้น 4 + 01A → B4-01A
 ```
 
-Use the shared helpers in `src/services/roomState.ts`:
+Use the shared helpers in `frontend/src/services/roomState.ts`:
 
 * `normalizeRoomSuffix`
 * `generateRoomCodeFromFloor`
